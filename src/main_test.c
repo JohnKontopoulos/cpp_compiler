@@ -1,9 +1,35 @@
 #include <stdio.h>
 #include "symtable.h"
+#include "ast.h"
 
 extern int yyparse();
 extern FILE *yyin;
 extern SymTable *symtable;
+extern ASTNode *ast_root;
+
+static void print_ast(ASTNode *root)
+{
+    printf("\n==================== AST ====================\n");
+    if (!root)
+    {
+        printf("(empty)\n");
+        return;
+    }
+    if (root->kind == NODE_COMPOUND)
+    {
+        printf("[COMPOUND] <unknown>\n");
+        ASTNode *stmt = root->left;
+        while (stmt)
+        {
+            ast_print(stmt, 1);
+            stmt = stmt->next;
+        }
+    }
+    else
+    {
+        ast_print(root, 0);
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +44,10 @@ int main(int argc, char *argv[])
     }
     symtable = symtable_create();
     yyparse();
+
+    print_ast(ast_root);
+
+    ast_free(ast_root);
     symtable_destroy(symtable);
     return 0;
 }

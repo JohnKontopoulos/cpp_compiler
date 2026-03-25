@@ -1,8 +1,12 @@
+
 %{
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "symtable.h"
+#include "ast.h"
+
+ASTNode *ast_root = NULL;
 
 extern int yylex();
 extern int yylineno;
@@ -18,20 +22,31 @@ int current_is_static = 0;
 %}
 
 %union {
-    int   ival;
-    float fval;
-    char  cval;
-    char  *sval;
+    int      ival;
+    float    fval;
+    char     cval;
+    char    *sval;
+    ASTNode *node;
 }
 
 %type <ival> standard_type typename
+%type <node> expression general_expression assignment
+%type <node> constant variable
+%type <node> optexpr
+%type <node> expression_list listexpression
+%type <node> main_function statements statement
+%type <node> if_statement while_statement for_statement
+%type <node> return_statement io_statement
+%type <node> comp_statement expression_statement
+%type <node> in_list in_item out_list out_item
+%type <node> decl_statements
 
 /* Tokens */
 %token TYPEDEF CHAR INT FLOAT STRING CONST CLASS
 %token PRIVATE PROTECTED PUBLIC VOID STATIC UNION ENUM LIST
 %token CONTINUE BREAK IF ELSE WHILE FOR RETURN LENGTH
 %token CIN COUT MAIN THIS SIZEOP
-%token LISTFUNC
+%token <sval> LISTFUNC
 %token OROP ANDOP EQUOP RELOP ADDOP MULOP NOTOP INCDEC
 %token LPAREN RPAREN SEMI DOT COMMA ASSIGN COLON
 %token LBRACK RBRACK REFER LBRACE RBRACE METH INP OUT
@@ -41,7 +56,7 @@ int current_is_static = 0;
 %token <sval> SCONST
 %token <sval> ID
 
-/* Προτεραιότητα τελεστών - από χαμηλότερη προς υψηλότερη */
+/* Προτεραιότητα τελεστών */
 %right ASSIGN
 %left COMMA
 %left OROP
@@ -64,7 +79,10 @@ int current_is_static = 0;
 /* ==================== ΠΡΟΓΡΑΜΜΑ ==================== */
 program
     : global_declarations main_function
-        { printf("Program parsed successfully!\n"); }
+        { 
+            printf("Program parsed successfully!\n");
+            ast_root = $2;
+        }
     ;
 
 global_declarations
@@ -78,8 +96,32 @@ global_declaration
     | enum_declaration
     | class_declaration
     | union_declaration
-    | global_var_declaration
-    | func_declaration
+    | typename listspec ID global_rest
+    ;
+
+/* ==================== GLOBAL REST ==================== */
+global_rest
+    : dims initializer SEMI
+    | dims initializer COMMA init_variabledefs SEMI
+    | LPAREN parameter_list RPAREN LBRACE
+        { symtable_enter_scope(symtable); }
+      decl_statements RBRACE
+        { symtable_exit_scope(symtable); }
+    | LPAREN parameter_list RPAREN SEMI
+    | LPAREN RPAREN LBRACE
+        { symtable_enter_scope(symtable); }
+      decl_statements RBRACE
+        { symtable_exit_scope(symtable); }
+    | LPAREN RPAREN SEMI
+    | LPAREN parameter_types RPAREN SEMI
+    | METH ID LPAREN parameter_list RPAREN LBRACE
+        { symtable_enter_scope(symtable); }
+      decl_statements RBRACE
+        { symtable_exit_scope(symtable); }
+    | METH ID LPAREN RPAREN LBRACE
+        { symtable_enter_scope(symtable); }
+      decl_statements RBRACE
+        { symtable_exit_scope(symtable); }
     ;
 
 /* ==================== TYPEDEF ==================== */
@@ -141,10 +183,8 @@ init_values
 
 /* ==================== ENUM ==================== */
 enum_declaration
-    : ENUM ID 
-        {
-            symtable_insert(symtable, $2, SYM_ENUM, TYPE_ENUM);
-        }
+    : ENUM ID
+        { symtable_insert(symtable, $2, SYM_ENUM, TYPE_ENUM); }
       enum_body SEMI
     ;
 
@@ -164,10 +204,8 @@ initializer
 
 /* ==================== CLASS ==================== */
 class_declaration
-    : CLASS ID 
-        {
-            symtable_insert(symtable, $2, SYM_CLASS, TYPE_CLASS);
-        }
+    : CLASS ID
+        { symtable_insert(symtable, $2, SYM_CLASS, TYPE_CLASS); }
       class_body SEMI
     ;
 
@@ -238,35 +276,18 @@ field
     ;
 
 method
-    : short_func_declaration
+    : typename listspec ID LPAREN parameter_types RPAREN SEMI
+    | typename listspec ID LPAREN RPAREN SEMI
     ;
 
 /* ==================== UNION ==================== */
 union_declaration
-    : UNION ID 
-        {
-            symtable_insert(symtable, $2, SYM_UNION, TYPE_UNION);
-        }
+    : UNION ID
+        { symtable_insert(symtable, $2, SYM_UNION, TYPE_UNION); }
       union_body SEMI
     ;
 
-/* ==================== ΣΥΝΑΡΤΗΣΕΙΣ ==================== */
-short_func_declaration
-    : short_par_func_header SEMI
-    | nopar_func_header SEMI
-    ;
-
-short_par_func_header
-    : func_header_start LPAREN parameter_types RPAREN
-    ;
-
-func_header_start
-    : typename listspec ID
-        {
-            symtable_insert(symtable, $3, SYM_FUNCTION, $1);
-        }
-    ;
-
+/* ==================== ΠΑΡΑΜΕΤΡΟΙ ==================== */
 parameter_types
     : parameter_types COMMA typename pass_list_dims
     | typename pass_list_dims
@@ -275,51 +296,6 @@ parameter_types
 pass_list_dims
     : REFER
     | listspec dims
-    ;
-
-nopar_func_header
-    : func_header_start LPAREN RPAREN
-    ;
-
-/* ==================== ΚΑΘΟΛΙΚΕΣ ΜΕΤΑΒΛΗΤΕΣ ==================== */
-global_var_declaration
-    : typename 
-        { current_type = $1; current_is_static = 0; }
-      init_variabledefs SEMI
-    ;
-
-init_variabledefs
-    : init_variabledefs COMMA init_variabledef
-    | init_variabledef
-    ;
-
-init_variabledef
-    : variabledef initializer
-    ;
-
-/* ==================== ΔΗΛΩΣΕΙΣ ΣΥΝΑΡΤΗΣΕΩΝ ==================== */
-func_declaration
-    : short_func_declaration
-    | full_func_declaration
-    ;
-
-full_func_declaration
-    : full_par_func_header LBRACE decl_statements RBRACE
-    | nopar_class_func_header LBRACE decl_statements RBRACE
-    | nopar_func_header LBRACE decl_statements RBRACE
-    ;
-
-full_par_func_header
-    : class_func_header_start LPAREN parameter_list RPAREN
-    | func_header_start LPAREN parameter_list RPAREN
-    ;
-
-class_func_header_start
-    : typename listspec func_class ID
-    ;
-
-func_class
-    : ID METH
     ;
 
 parameter_list
@@ -332,16 +308,22 @@ pass_variabledef
     | REFER ID
     ;
 
-nopar_class_func_header
-    : class_func_header_start LPAREN RPAREN
+/* ==================== ΚΑΘΟΛΙΚΕΣ ΜΕΤΑΒΛΗΤΕΣ ==================== */
+init_variabledefs
+    : init_variabledefs COMMA init_variabledef
+    | init_variabledef
+    ;
+
+init_variabledef
+    : variabledef initializer
     ;
 
 /* ==================== ΕΝΤΟΛΕΣ ==================== */
 decl_statements
-    : declarations statements
-    | declarations
-    | statements
-    | /* empty */
+    : declarations statements  { $$ = $2; }
+    | declarations             { $$ = NULL; }
+    | statements               { $$ = $1; }
+    | /* empty */              { $$ = NULL; }
     ;
 
 declarations
@@ -359,134 +341,109 @@ declarations
     | standard_type
         { current_type = $1; current_is_static = 0; }
       variabledefs SEMI
-    | error SEMI
-        { fprintf(stderr, "Error recovery: skipping declaration at line %d\n", yylineno); }
     ;
-
 
 statements
     : statements statement
+        { $$ = ast_append($1, $2); }
     | statement
+        { $$ = $1; }
     ;
 
 statement
-    : expression_statement
-    | if_statement
-    | while_statement
-    | for_statement
-    | return_statement
-    | io_statement
-    | comp_statement
-    | CONTINUE SEMI
-    | BREAK SEMI
-    | SEMI
-    | error SEMI
-        { fprintf(stderr, "Error recovery: skipping to next statement at line %d\n", yylineno); }
+    : expression_statement  { $$ = $1; }
+    | if_statement          { $$ = $1; }
+    | while_statement       { $$ = $1; }
+    | for_statement         { $$ = $1; }
+    | return_statement      { $$ = $1; }
+    | io_statement          { $$ = $1; }
+    | comp_statement        { $$ = $1; }
+    | CONTINUE SEMI         { $$ = ast_make_node_simple(NODE_CONTINUE); }
+    | BREAK SEMI            { $$ = ast_make_node_simple(NODE_BREAK); }
+    | SEMI                  { $$ = NULL; }
+    | error SEMI            { $$ = NULL; fprintf(stderr, "Error recovery at line %d\n", yylineno); }
     ;
 
 expression_statement
     : general_expression SEMI
+        { $$ = $1; }
     ;
 
 if_statement
-    : IF LPAREN general_expression RPAREN 
-        { symtable_enter_scope(symtable); }
-      statement 
-        { symtable_exit_scope(symtable); }
+    : IF LPAREN general_expression RPAREN statement
       %prec LOWER_THAN_ELSE
-    | IF LPAREN general_expression RPAREN
-        { symtable_enter_scope(symtable); }
-      statement
-        { symtable_exit_scope(symtable); }
-      ELSE
-        { symtable_enter_scope(symtable); }
-      statement
-        { symtable_exit_scope(symtable); }
+        { $$ = ast_make_if($3, $5, NULL); }
+    | IF LPAREN general_expression RPAREN statement ELSE statement
+        { $$ = ast_make_if($3, $5, $7); }
     ;
 
 while_statement
-    : WHILE LPAREN general_expression RPAREN
-        { symtable_enter_scope(symtable); }
-      statement
-        { symtable_exit_scope(symtable); }
+    : WHILE LPAREN general_expression RPAREN statement
+        { $$ = ast_make_while($3, $5); }
     ;
 
 for_statement
-    : FOR LPAREN optexpr SEMI optexpr SEMI optexpr RPAREN
-        { symtable_enter_scope(symtable); }
-      statement
-        { symtable_exit_scope(symtable); }
+    : FOR LPAREN optexpr SEMI optexpr SEMI optexpr RPAREN statement
+        { $$ = ast_make_for($3, $5, $7, $9); }
     ;
 
 optexpr
-    : general_expression
-    | /* empty */
+    : general_expression  { $$ = $1; }
+    | /* empty */         { $$ = NULL; }
     ;
 
 return_statement
     : RETURN optexpr SEMI
+        { $$ = ast_make_return($2); }
     ;
 
 io_statement
     : CIN INP in_list SEMI
+        { $$ = ast_make_cin($3); }
     | COUT OUT out_list SEMI
+        { $$ = ast_make_cout($3); }
     ;
 
 in_list
     : in_list INP in_item
+        { $1->next = $3; $$ = $1; }
     | in_item
+        { $$ = $1; }
     ;
 
 in_item
-    : variable
+    : variable  { $$ = $1; }
     ;
 
 out_list
     : out_list OUT out_item
+        { $1->next = $3; $$ = $1; }
     | out_item
+        { $$ = $1; }
     ;
 
 out_item
-    : general_expression
+    : general_expression  { $$ = $1; }
     ;
 
 comp_statement
-    : LBRACE decl_statements RBRACE
+    : LBRACE
+        { symtable_enter_scope(symtable); }
+      decl_statements RBRACE
+        {
+            symtable_exit_scope(symtable);
+            $$ = ast_make_compound($3);
+        }
     ;
 
 /* ==================== MAIN ==================== */
 main_function
-    : main_header LBRACE 
+    : main_header LBRACE
         { symtable_enter_scope(symtable); }
-      decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
-    ;
-
-full_func_declaration
-    : full_par_func_header LBRACE 
-        { symtable_enter_scope(symtable); }
-      decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
-    | nopar_class_func_header LBRACE 
-        { symtable_enter_scope(symtable); }
-      decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
-    | nopar_func_header LBRACE 
-        { symtable_enter_scope(symtable); }
-      decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
-    ;
-
-comp_statement
-    : LBRACE 
-        { 
-            printf("DEBUG: entering comp_statement\n");
-            symtable_enter_scope(symtable); 
-        }
       decl_statements RBRACE
         { 
-            printf("DEBUG: exiting comp_statement\n");
-            symtable_exit_scope(symtable); 
+            symtable_exit_scope(symtable);
+            $$ = ast_make_compound($4);
         }
     ;
 
@@ -497,57 +454,89 @@ main_header
 /* ==================== ΕΚΦΡΑΣΕΙΣ ==================== */
 general_expression
     : general_expression COMMA general_expression
+        { $$ = ast_make_binop(",", $1, $3); }
     | assignment
+        { $$ = $1; }
     ;
 
 assignment
     : variable ASSIGN assignment
+        { $$ = ast_make_assign($1, $3); }
     | expression
+        { $$ = $1; }
     ;
 
 expression
     : expression OROP expression
+        { $$ = ast_make_binop("||", $1, $3); }
     | expression ANDOP expression
+        { $$ = ast_make_binop("&&", $1, $3); }
     | expression EQUOP expression
+        { $$ = ast_make_binop("==", $1, $3); }
     | expression RELOP expression
+        { $$ = ast_make_binop("<>", $1, $3); }
     | expression ADDOP expression
+        { $$ = ast_make_binop("+", $1, $3); }
     | expression MULOP expression
+        { $$ = ast_make_binop("*", $1, $3); }
     | NOTOP expression
+        { $$ = ast_make_unop("!", $2); }
     | ADDOP expression %prec UMINUS
+        { $$ = ast_make_unop("-", $2); }
     | SIZEOP expression
+        { $$ = ast_make_unop("sizeof", $2); }
     | INCDEC variable %prec PREINCDEC
+        { $$ = ast_make_unop("pre++", $2); }
     | variable INCDEC %prec POSTINCDEC
+        { $$ = ast_make_unop("post++", $1); }
     | variable
+        { $$ = $1; }
     | variable LPAREN expression_list RPAREN
+        { $$ = ast_make_call($1->name, $3); }
     | LENGTH LPAREN general_expression RPAREN
+        { $$ = ast_make_call("length", $3); }
     | constant
+        { $$ = $1; }
     | LPAREN general_expression RPAREN
+        { $$ = $2; }
     | LPAREN standard_type RPAREN
+        { $$ = ast_make_iconst($2); }
     | listexpression
+        { $$ = $1; }
     ;
 
 variable
     : variable LBRACK general_expression RBRACK
+        { $$ = ast_make_binop("[]", $1, $3); }
     | variable DOT ID
+        { $$ = ast_make_binop(".", $1, ast_make_id($3, TYPE_UNKNOWN)); }
     | LISTFUNC LPAREN general_expression RPAREN
+        { $$ = ast_make_call($1, $3); }
     | ID
+        {
+            Symbol *s = symtable_lookup(symtable, $1);
+            SymType t = s ? s->type : TYPE_UNKNOWN;
+            $$ = ast_make_id($1, t);
+        }
     | THIS
+        { $$ = ast_make_id("this", TYPE_UNKNOWN); }
     ;
 
 expression_list
-    : general_expression
-    | /* empty */
+    : general_expression  { $$ = $1; }
+    | /* empty */         { $$ = NULL; }
     ;
 
 constant
-    : CCONST
-    | ICONST
-    | FCONST
-    | SCONST
+    : CCONST  { $$ = ast_make_cconst($1); }
+    | ICONST  { $$ = ast_make_iconst($1); }
+    | FCONST  { $$ = ast_make_fconst($1); }
+    | SCONST  { $$ = ast_make_sconst($1); }
     ;
 
 listexpression
     : LBRACK expression_list RBRACK
+        { $$ = $2; }
     ;
 
 %%
