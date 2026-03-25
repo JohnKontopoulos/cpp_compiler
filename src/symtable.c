@@ -47,28 +47,21 @@ void symtable_exit_scope(SymTable *st)
     printf("%-20s %-12s %-12s %s\n", "Name", "Kind", "Type", "Depth");
     printf("%-20s %-12s %-12s %s\n", "----", "----", "----", "-----");
 
-    /* Εκτύπωση και διαγραφή συμβόλων της τρέχουσας εμβέλειας */
+    /* Εκτύπωση συμβόλων - ΔΕΝ διαγράφουμε */
     for (int i = 0; i < MAX_SYMBOLS; i++)
     {
-        Symbol **sp = &st->table[i];
-        while (*sp)
+        Symbol *s = st->table[i];
+        while (s)
         {
-            if ((*sp)->depth == st->current_depth)
+            if (s->depth == st->current_depth)
             {
                 printf("%-20s %-12s %-12s %d\n",
-                       (*sp)->name,
-                       symkind_to_str((*sp)->kind),
-                       symtype_to_str((*sp)->type),
-                       (*sp)->depth);
-                /* Διαγραφή από τον πίνακα */
-                Symbol *to_del = *sp;
-                *sp = (*sp)->next;
-                free(to_del);
+                       s->name,
+                       symkind_to_str(s->kind),
+                       symtype_to_str(s->type),
+                       s->depth);
             }
-            else
-            {
-                sp = &(*sp)->next;
-            }
+            s = s->next;
         }
     }
     st->current_depth--;

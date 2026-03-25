@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "symtable.h"
 #include "ast.h"
+#include "semantic.h"
 
 extern int yyparse();
 extern FILE *yyin;
@@ -46,6 +47,9 @@ int main(int argc, char *argv[])
     yyparse();
 
     print_ast(ast_root);
+
+    /* Σημασιολογικός έλεγχος */
+    semantic_check_program(ast_root, symtable);
 
     ast_free(ast_root);
     symtable_destroy(symtable);
