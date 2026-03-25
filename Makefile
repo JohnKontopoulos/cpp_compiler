@@ -1,0 +1,36 @@
+CC = gcc
+CFLAGS = -Wall -g
+SRC_DIR = src
+BUILD_DIR = build
+
+all: $(BUILD_DIR)/compiler
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/parser.tab.c $(BUILD_DIR)/parser.tab.h: $(SRC_DIR)/parser.y | $(BUILD_DIR)
+	bison -d -v -o $(BUILD_DIR)/parser.tab.c $(SRC_DIR)/parser.y
+
+$(BUILD_DIR)/lex.yy.c: $(SRC_DIR)/lexer.l $(BUILD_DIR)/parser.tab.h | $(BUILD_DIR)
+	flex -o $(BUILD_DIR)/lex.yy.c $(SRC_DIR)/lexer.l
+
+$(BUILD_DIR)/parser.tab.o: $(BUILD_DIR)/parser.tab.c
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -I$(SRC_DIR) -c $< -o $@
+
+$(BUILD_DIR)/lex.yy.o: $(BUILD_DIR)/lex.yy.c
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -I$(SRC_DIR) -c $< -o $@
+
+$(BUILD_DIR)/symtable.o: $(SRC_DIR)/symtable.c $(SRC_DIR)/symtable.h
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $< -o $@
+
+$(BUILD_DIR)/main_test.o: $(SRC_DIR)/main_test.c
+	$(CC) $(CFLAGS) -I$(BUILD_DIR) -I$(SRC_DIR) -c $< -o $@
+
+$(BUILD_DIR)/compiler: $(BUILD_DIR)/lex.yy.o $(BUILD_DIR)/parser.tab.o \
+                       $(BUILD_DIR)/symtable.o $(BUILD_DIR)/main_test.o
+	$(CC) $(CFLAGS) -o $@ $^ -lfl
+
+clean:
+	rm -rf $(BUILD_DIR)
+
+.PHONY: all clean
