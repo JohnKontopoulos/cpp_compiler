@@ -1,0 +1,51 @@
+INT
+MAIN
+LPAREN
+RPAREN
+LBRACE
+[Scope] Entering depth 1
+INT
+ID(x)
+SEMI
+FLOAT
+ID(y)
+SEMI
+ID(x)
+ASSIGN
+ICONST(5)
+SEMI
+IF
+LPAREN
+ID(x)
+RELOP
+ICONST(0)
+RPAREN
+LBRACE
+INT
+ID(z)
+SEMI
+ID(z)
+ASSIGN
+ID(x)
+ADDOP
+ICONST(1)
+SEMI
+COUT
+OUT
+ID(z)
+SEMI
+RBRACE
+RETURN
+ICONST(0)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 1 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+x                    VARIABLE     int          1
+y                    VARIABLE     float        1
+z                    VARIABLE     int          1
+[Scope] Back to depth 0
+
+Program parsed successfully!

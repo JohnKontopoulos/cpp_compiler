@@ -141,7 +141,11 @@ init_values
 
 /* ==================== ENUM ==================== */
 enum_declaration
-    : ENUM ID enum_body SEMI
+    : ENUM ID 
+        {
+            symtable_insert(symtable, $2, SYM_ENUM, TYPE_ENUM);
+        }
+      enum_body SEMI
     ;
 
 enum_body
@@ -160,7 +164,11 @@ initializer
 
 /* ==================== CLASS ==================== */
 class_declaration
-    : CLASS ID class_body SEMI
+    : CLASS ID 
+        {
+            symtable_insert(symtable, $2, SYM_CLASS, TYPE_CLASS);
+        }
+      class_body SEMI
     ;
 
 class_body
@@ -235,7 +243,11 @@ method
 
 /* ==================== UNION ==================== */
 union_declaration
-    : UNION ID union_body SEMI
+    : UNION ID 
+        {
+            symtable_insert(symtable, $2, SYM_UNION, TYPE_UNION);
+        }
+      union_body SEMI
     ;
 
 /* ==================== ΣΥΝΑΡΤΗΣΕΙΣ ==================== */
@@ -250,6 +262,9 @@ short_par_func_header
 
 func_header_start
     : typename listspec ID
+        {
+            symtable_insert(symtable, $3, SYM_FUNCTION, $1);
+        }
     ;
 
 parameter_types
@@ -268,7 +283,9 @@ nopar_func_header
 
 /* ==================== ΚΑΘΟΛΙΚΕΣ ΜΕΤΑΒΛΗΤΕΣ ==================== */
 global_var_declaration
-    : typename init_variabledefs SEMI
+    : typename 
+        { current_type = $1; current_is_static = 0; }
+      init_variabledefs SEMI
     ;
 
 init_variabledefs
@@ -328,20 +345,22 @@ decl_statements
     ;
 
 declarations
-    : declarations STATIC standard_type 
+    : declarations STATIC standard_type
         { current_type = $3; current_is_static = 1; }
       variabledefs SEMI
         { current_is_static = 0; }
-    | declarations standard_type 
+    | declarations standard_type
         { current_type = $2; current_is_static = 0; }
       variabledefs SEMI
-    | STATIC standard_type 
+    | STATIC standard_type
         { current_type = $2; current_is_static = 1; }
       variabledefs SEMI
         { current_is_static = 0; }
-    | standard_type 
+    | standard_type
         { current_type = $1; current_is_static = 0; }
       variabledefs SEMI
+    | error SEMI
+        { fprintf(stderr, "Error recovery: skipping declaration at line %d\n", yylineno); }
     ;
 
 
@@ -361,6 +380,8 @@ statement
     | CONTINUE SEMI
     | BREAK SEMI
     | SEMI
+    | error SEMI
+        { fprintf(stderr, "Error recovery: skipping to next statement at line %d\n", yylineno); }
     ;
 
 expression_statement
@@ -368,16 +389,33 @@ expression_statement
     ;
 
 if_statement
-    : IF LPAREN general_expression RPAREN statement %prec LOWER_THAN_ELSE
-    | IF LPAREN general_expression RPAREN statement ELSE statement
+    : IF LPAREN general_expression RPAREN 
+        { symtable_enter_scope(symtable); }
+      statement 
+        { symtable_exit_scope(symtable); }
+      %prec LOWER_THAN_ELSE
+    | IF LPAREN general_expression RPAREN
+        { symtable_enter_scope(symtable); }
+      statement
+        { symtable_exit_scope(symtable); }
+      ELSE
+        { symtable_enter_scope(symtable); }
+      statement
+        { symtable_exit_scope(symtable); }
     ;
 
 while_statement
-    : WHILE LPAREN general_expression RPAREN statement
+    : WHILE LPAREN general_expression RPAREN
+        { symtable_enter_scope(symtable); }
+      statement
+        { symtable_exit_scope(symtable); }
     ;
 
 for_statement
-    : FOR LPAREN optexpr SEMI optexpr SEMI optexpr RPAREN statement
+    : FOR LPAREN optexpr SEMI optexpr SEMI optexpr RPAREN
+        { symtable_enter_scope(symtable); }
+      statement
+        { symtable_exit_scope(symtable); }
     ;
 
 optexpr
@@ -441,9 +479,15 @@ full_func_declaration
 
 comp_statement
     : LBRACE 
-        { symtable_enter_scope(symtable); }
+        { 
+            printf("DEBUG: entering comp_statement\n");
+            symtable_enter_scope(symtable); 
+        }
       decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
+        { 
+            printf("DEBUG: exiting comp_statement\n");
+            symtable_exit_scope(symtable); 
+        }
     ;
 
 main_header
@@ -512,7 +556,7 @@ void yyerror(const char *msg) {
     fprintf(stderr, "Syntax error at line %d: %s\n", yylineno, msg);
     error_count++;
     if (error_count >= 5) {
-        fprintf(stderr, "Too many errors, aborting.\n");
+        fprintf(stderr, "Too many errors (5), aborting.\n");
         exit(1);
     }
 }
