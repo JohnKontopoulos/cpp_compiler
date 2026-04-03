@@ -12,16 +12,17 @@ extern int yylex();
 extern int yylineno;
 extern char *yytext;
 extern char current_line[];
-extern int line_num;
 
 void yyerror(const char *msg);
 int error_count = 0;
 
-SymTable *symtable;
+SymTable  *symtable;
 DataSpace *dataspace;
 
-SymType current_type = TYPE_UNKNOWN;
-int current_is_static = 0;
+SymType current_type      = TYPE_UNKNOWN;
+int     current_is_static = 0;
+char    current_func_name[256] = "";
+int     current_param_index    = 0;
 %}
 
 %union {
@@ -99,7 +100,14 @@ global_declaration
     | enum_declaration
     | class_declaration
     | union_declaration
-    | typename listspec ID global_rest
+    | typename listspec ID
+        {
+            current_type = $1;
+            strncpy(current_func_name, $3, 255);
+            current_param_index = 0;
+            /* Εισαγωγή στον ΠΣ ως συνάρτηση προσωρινά */
+        }
+      global_rest
     ;
 
 /* ==================== GLOBAL REST ==================== */
@@ -114,7 +122,7 @@ global_rest
             symtable_exit_scope(symtable);
             dataspace_exit_scope(dataspace, d);
             if ($6) {
-                printf("\n=== AST for function ===\n");
+                fprintf(stderr, "\n=== AST for function '%s' ===\n", current_func_name);
                 ASTNode *stmt = $6;
                 while (stmt) { ast_print(stmt, 1); stmt = stmt->next; }
             }
@@ -128,7 +136,7 @@ global_rest
             symtable_exit_scope(symtable);
             dataspace_exit_scope(dataspace, d);
             if ($5) {
-                printf("\n=== AST for function ===\n");
+                fprintf(stderr, "\n=== AST for function '%s' ===\n", current_func_name);
                 ASTNode *stmt = $5;
                 while (stmt) { ast_print(stmt, 1); stmt = stmt->next; }
             }
@@ -156,6 +164,13 @@ global_rest
 /* ==================== TYPEDEF ==================== */
 typedef_declaration
     : TYPEDEF typename listspec ID dims SEMI
+        {
+            Symbol *s = symtable_insert(symtable, $4, SYM_TYPE, (SymType)$2);
+            if (s) {
+                fprintf(stderr, "[SymTable] typedef '%s' = type %s\n",
+                        $4, symtype_to_str((SymType)$2));
+            }
+        }
     ;
 
 typename
@@ -188,7 +203,12 @@ dim
 
 /* ==================== CONST ==================== */
 const_declaration
-    : CONST typename constdefs SEMI
+    : CONST standard_type
+        { current_type = $2; }
+      constdefs SEMI
+    | CONST ID
+        { current_type = TYPE_UNKNOWN; }
+      constdefs SEMI
     ;
 
 constdefs
@@ -198,6 +218,14 @@ constdefs
 
 constdef
     : ID dims ASSIGN init_value
+        {
+            Symbol *s = symtable_insert(symtable, $1, SYM_CONSTANT, current_type);
+            if (s) {
+                s->is_const = 1;
+                fprintf(stderr, "[SymTable] const '%s' type=%s\n",
+                        $1, symtype_to_str(current_type));
+            }
+        }
     ;
 
 init_value
@@ -342,9 +370,31 @@ parameter_list
 
 pass_variabledef
     : variabledef
+        {
+            Symbol *func = symtable_lookup(symtable, current_func_name);
+            if (func && current_param_index < MAX_PARAMS) {
+                strncpy(func->params[current_param_index].name, "", MAX_NAME-1);
+                func->params[current_param_index].type   = current_type;
+                func->params[current_param_index].by_ref = 0;
+                func->param_count++;
+                fprintf(stderr, "[SymTable] param %d: type=%s by_value\n",
+                        current_param_index, symtype_to_str(current_type));
+                current_param_index++;
+            }
+        }
     | REFER ID
         {
             Symbol *s = symtable_insert(symtable, $2, SYM_PARAMETER, current_type);
+            Symbol *func = symtable_lookup(symtable, current_func_name);
+            if (func && current_param_index < MAX_PARAMS) {
+                strncpy(func->params[current_param_index].name, $2, MAX_NAME-1);
+                func->params[current_param_index].type   = current_type;
+                func->params[current_param_index].by_ref = 1;
+                func->param_count++;
+                fprintf(stderr, "[SymTable] param %d: '%s' type=%s by_ref\n",
+                        current_param_index, $2, symtype_to_str(current_type));
+                current_param_index++;
+            }
             if (s) s->is_static = 0;
         }
     ;
@@ -402,7 +452,7 @@ statement
     | CONTINUE SEMI         { $$ = ast_make_node_simple(NODE_CONTINUE); }
     | BREAK SEMI            { $$ = ast_make_node_simple(NODE_BREAK); }
     | SEMI                  { $$ = NULL; }
-    | error SEMI            { $$ = NULL; fprintf(stderr, "Error recovery at line %d\n", yylineno); }
+    | error SEMI            { $$ = NULL; fprintf(stderr, "Error recovery at line %d\n>>> Line %d: %s\n", yylineno, yylineno, current_line); }
     ;
 
 expression_statement

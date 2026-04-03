@@ -69,7 +69,7 @@ DataEntry *dataspace_alloc(DataSpace *ds, const char *name,
 
 void dataspace_enter_scope(DataSpace *ds)
 {
-    ds->local_offset = 0; /* νέα εμβέλεια ξεκινά από 0 */
+    /* ΔΕΝ μηδενίζουμε το offset — συνεχίζουμε από εκεί που ήμασταν */
 }
 
 void dataspace_exit_scope(DataSpace *ds, int depth)

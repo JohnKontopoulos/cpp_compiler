@@ -46,6 +46,7 @@ void symtable_exit_scope(SymTable *st)
     fprintf(stderr, "\n[Scope] Exiting depth %d - Symbols:\n", st->current_depth);
     fprintf(stderr, "%-20s %-12s %-12s %s\n", "Name", "Kind", "Type", "Depth");
     fprintf(stderr, "%-20s %-12s %-12s %s\n", "----", "----", "----", "-----");
+
     for (int i = 0; i < MAX_SYMBOLS; i++)
     {
         Symbol *s = st->table[i];
