@@ -139,6 +139,14 @@ ASTNode *ast_make_compound(ASTNode *stmts)
     return n;
 }
 
+ASTNode *ast_make_var_decl(char *name, SymType type)
+{
+    ASTNode *n = ast_make_node(NODE_VAR_DECL);
+    n->name = strdup(name);
+    n->type = type;
+    return n;
+}
+
 ASTNode *ast_make_cout(ASTNode *exprs)
 {
     ASTNode *n = ast_make_node(NODE_COUT);
@@ -156,6 +164,14 @@ ASTNode *ast_make_cin(ASTNode *vars)
 ASTNode *ast_make_node_simple(NodeKind kind)
 {
     return ast_make_node(kind);
+}
+
+ASTNode *ast_make_cast(ASTNode *expr, SymType to_type)
+{
+    ASTNode *n = ast_make_node(NODE_CAST);
+    n->left = expr;
+    n->type = to_type;
+    return n;
 }
 
 ASTNode *ast_append(ASTNode *list, ASTNode *node)
@@ -205,6 +221,8 @@ static const char *nodekind_str(NodeKind k)
         return "FIELD";
     case NODE_INCDEC:
         return "INCDEC";
+    case NODE_CAST:
+        return "CAST";
     case NODE_IF:
         return "IF";
     case NODE_WHILE:
@@ -271,6 +289,9 @@ static void ast_print_node(ASTNode *node, int indent)
     case NODE_VAR_DECL:
         fprintf(stderr, " %s:%s", node->name, symtype_to_str(node->type));
         break;
+    case NODE_CAST:
+        fprintf(stderr, " →%s", symtype_to_str(node->type));
+        break;
     default:
         break;
     }
@@ -290,7 +311,7 @@ void ast_print(ASTNode *node, int indent)
     {
         for (int i = 0; i < indent; i++)
             fprintf(stderr, "  ");
-        fprintf(stderr, "[COMPOUND] <unknown>\n"); /* ← προσθήκη \n */
+        fprintf(stderr, "[COMPOUND] <unknown>\n");
         ASTNode *stmt = node->left;
         while (stmt)
         {
@@ -311,7 +332,6 @@ void ast_free(ASTNode *node)
     ast_free(node->left);
     ast_free(node->right);
     ast_free(node->extra);
-    /* ΜΗΝ κάνεις free το next εδώ - γίνεται από τον caller */
     if (node->name)
         free(node->name);
     if (node->kind == NODE_SCONST && node->val.sval)

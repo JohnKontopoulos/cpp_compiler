@@ -20,7 +20,7 @@ typedef enum
     NODE_FIELD,
     NODE_INCDEC,
     NODE_LIST,
-    NODE_CAST,
+    NODE_CAST, /* μετατροπή τύπου */
 
     /* Εντολές */
     NODE_EXPR_STMT,
@@ -48,8 +48,8 @@ typedef enum
 typedef struct ASTNode
 {
     NodeKind kind;
-    SymType type;  /* τύπος έκφρασης */
-    int is_lvalue; /* είναι L-value; */
+    SymType type;
+    int is_lvalue;
 
     union
     {
@@ -57,15 +57,15 @@ typedef struct ASTNode
         float fval;
         char cval;
         char *sval;
-        char op; /* για binary/unary operators */
+        char op;
     } val;
 
-    char *name; /* για ID, function names */
+    char *name;
 
-    struct ASTNode *left;  /* αριστερό παιδί */
-    struct ASTNode *right; /* δεξί παιδί */
-    struct ASTNode *extra; /* επιπλέον παιδί (π.χ. else branch) */
-    struct ASTNode *next;  /* επόμενη εντολή στη λίστα */
+    struct ASTNode *left;
+    struct ASTNode *right;
+    struct ASTNode *extra;
+    struct ASTNode *next;
 } ASTNode;
 
 /* Δημιουργία κόμβων */
@@ -87,6 +87,7 @@ ASTNode *ast_make_var_decl(char *name, SymType type);
 ASTNode *ast_make_cout(ASTNode *exprs);
 ASTNode *ast_make_cin(ASTNode *vars);
 ASTNode *ast_make_node_simple(NodeKind kind);
+ASTNode *ast_make_cast(ASTNode *expr, SymType to_type);
 ASTNode *ast_append(ASTNode *list, ASTNode *node);
 
 /* Εκτύπωση ΑΣΔ */

@@ -120,8 +120,29 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
     {
         SymType lt = semantic_check_expr(node->left, st);
         SymType rt = semantic_check_expr(node->right, st);
+
         if (!types_compatible(lt, rt))
+        {
             sem_error("incompatible types in assignment", "=");
+        }
+        else if (lt != rt)
+        {
+            /* Προσθήκη cast node αν χρειάζεται */
+            if (lt == TYPE_FLOAT && rt == TYPE_INT)
+            {
+                /* int → float: αυτόματη μετατροπή */
+                ASTNode *cast = ast_make_cast(node->right, TYPE_FLOAT);
+                node->right = cast;
+                fprintf(stderr, "[Semantic] cast int→float added\n");
+            }
+            else if (lt == TYPE_INT && rt == TYPE_FLOAT)
+            {
+                /* float → int: αποκοπή κλασματικού */
+                ASTNode *cast = ast_make_cast(node->right, TYPE_INT);
+                node->right = cast;
+                fprintf(stderr, "[Semantic] cast float→int added\n");
+            }
+        }
         node->type = lt;
         return lt;
     }
