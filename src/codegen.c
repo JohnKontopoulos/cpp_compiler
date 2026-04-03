@@ -62,6 +62,11 @@ char *codegen_alloc_reg(CodeGen *cg, SymType type)
                 return cg->f_regs[i].name;
             }
         }
+        /* #8 Διάχυση - spill πρώτο register στη στοίβα */
+        fprintf(stderr, "[CodeGen] WARNING: spilling float register %s\n",
+                cg->f_regs[0].name);
+        codegen_emit(cg, "\taddiu $sp, $sp, -4");
+        codegen_emit(cg, "\ts.s %s, 0($sp)\t# spill", cg->f_regs[0].name);
         return cg->f_regs[0].name;
     }
     else
@@ -74,6 +79,11 @@ char *codegen_alloc_reg(CodeGen *cg, SymType type)
                 return cg->t_regs[i].name;
             }
         }
+        /* #8 Διάχυση - spill πρώτο register στη στοίβα */
+        fprintf(stderr, "[CodeGen] WARNING: spilling int register %s\n",
+                cg->t_regs[0].name);
+        codegen_emit(cg, "\taddiu $sp, $sp, -4");
+        codegen_emit(cg, "\tsw %s, 0($sp)\t# spill", cg->t_regs[0].name);
         return cg->t_regs[0].name;
     }
 }
