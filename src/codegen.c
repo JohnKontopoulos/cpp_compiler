@@ -716,85 +716,156 @@ void codegen_stmt(CodeGen *cg, ASTNode *node)
         break;
     }
 
-    /* #5 Έξοδος cout */
+        /* #5 Έξοδος cout */
     case NODE_COUT:
     {
+        /* Δημιουργία format string στο .data */
+        char fmt_label[32];
+        char fmt_str[256] = "";
+
+        /* Χτίζουμε το format string */
         ASTNode *item = node->left;
+        while (item)
+        {
+            if (item->type == TYPE_FLOAT)
+                strcat(fmt_str, "%f");
+            else if (item->type == TYPE_STRING || item->kind == NODE_SCONST)
+                strcat(fmt_str, "%s");
+            else if (item->type == TYPE_CHAR)
+                strcat(fmt_str, "%c");
+            else
+                strcat(fmt_str, "%d");
+            item = item->next;
+        }
+        strcat(fmt_str, "\\n");
+
+        /* Αποθήκευση format string στο .data */
+        sprintf(fmt_label, "FMT%d", cg->label_count++);
+        if (cg->str_count < 256)
+        {
+            strncpy(cg->str_labels[cg->str_count], fmt_label, 63);
+            snprintf(cg->str_values[cg->str_count], 511, "\"%s\"", fmt_str);
+            cg->str_count++;
+        }
+
+        /* Αποθήκευση $ra */
+        codegen_emit(cg, "\taddiu $sp, $sp, -4");
+        codegen_emit(cg, "\tsw $ra, 0($sp)\t# save $ra for _printf");
+
+        /* Φόρτωση format string ως $a0 */
+        codegen_emit(cg, "\tla $a0, %s\t# printf format", fmt_label);
+
+        /* Φόρτωση υπολοίπων ορισμάτων σε $a1, $a2, ... */
+        int arg_num = 1;
+        item = node->left;
         while (item)
         {
             char *reg = codegen_expr(cg, item);
-            if (item->type == TYPE_FLOAT)
+            if (arg_num < 4)
             {
-                codegen_emit(cg, "\tmov.s $f12, %s", reg);
-                codegen_emit(cg, "\tli $v0, 2\t# print float");
-                codegen_emit(cg, "\tsyscall");
-            }
-            else if (item->type == TYPE_STRING ||
-                     item->kind == NODE_SCONST)
-            {
-                codegen_emit(cg, "\tmove $a0, %s", reg);
-                codegen_emit(cg, "\tli $v0, 4\t# print string");
-                codegen_emit(cg, "\tsyscall");
-            }
-            else if (item->type == TYPE_CHAR)
-            {
-                codegen_emit(cg, "\tmove $a0, %s", reg);
-                codegen_emit(cg, "\tli $v0, 11\t# print char");
-                codegen_emit(cg, "\tsyscall");
+                if (item->type == TYPE_FLOAT)
+                    codegen_emit(cg, "\tmov.s $f%d, %s\t# printf arg %d",
+                                 arg_num * 2, reg, arg_num);
+                else
+                    codegen_emit(cg, "\tmove $a%d, %s\t# printf arg %d",
+                                 arg_num, reg, arg_num);
             }
             else
             {
-                codegen_emit(cg, "\tmove $a0, %s", reg);
-                codegen_emit(cg, "\tli $v0, 1\t# print int");
-                codegen_emit(cg, "\tsyscall");
+                codegen_emit(cg, "\taddiu $sp, $sp, -4");
+                codegen_emit(cg, "\tsw %s, 0($sp)\t# printf arg %d",
+                             reg, arg_num);
             }
             codegen_free_reg(cg, reg);
             item = item->next;
+            arg_num++;
         }
-        /* Newline */
-        codegen_emit(cg, "\tli $a0, 10\t# newline");
-        codegen_emit(cg, "\tli $v0, 11");
-        codegen_emit(cg, "\tsyscall");
+
+        /* Κλήση _printf */
+        codegen_emit(cg, "\tjal _printf\t# call _printf");
+
+        /* Επαναφορά $ra */
+        codegen_emit(cg, "\tlw $ra, 0($sp)\t# restore $ra");
+        codegen_emit(cg, "\taddiu $sp, $sp, 4");
         break;
     }
 
-    /* #5 Είσοδος cin */
     case NODE_CIN:
     {
+        /* Δημιουργία format string για scanf */
+        char fmt_label[32];
+        char fmt_str[256] = "";
+
         ASTNode *item = node->left;
         while (item)
         {
-            int is_global = 0;
-            int offset = 0;
-            if (item->kind == NODE_ID)
-                offset = find_offset(cg, item->name, &is_global);
-
             if (item->type == TYPE_FLOAT)
-            {
-                codegen_emit(cg, "\tli $v0, 6\t# read float");
-                codegen_emit(cg, "\tsyscall");
-                if (item->kind == NODE_ID)
-                    codegen_store(cg, "$f0", offset, is_global,
-                                  TYPE_FLOAT, item->name);
-            }
+                strcat(fmt_str, "%f");
             else if (item->type == TYPE_CHAR)
-            {
-                codegen_emit(cg, "\tli $v0, 12\t# read char");
-                codegen_emit(cg, "\tsyscall");
-                if (item->kind == NODE_ID)
-                    codegen_store(cg, "$v0", offset, is_global,
-                                  TYPE_INT, item->name);
-            }
+                strcat(fmt_str, "%c");
             else
-            {
-                codegen_emit(cg, "\tli $v0, 5\t# read int");
-                codegen_emit(cg, "\tsyscall");
-                if (item->kind == NODE_ID)
-                    codegen_store(cg, "$v0", offset, is_global,
-                                  TYPE_INT, item->name);
-            }
+                strcat(fmt_str, "%d");
             item = item->next;
         }
+
+        /* Αποθήκευση format string στο .data */
+        sprintf(fmt_label, "FMT%d", cg->label_count++);
+        if (cg->str_count < 256)
+        {
+            strncpy(cg->str_labels[cg->str_count], fmt_label, 63);
+            snprintf(cg->str_values[cg->str_count], 511, "\"%s\"", fmt_str);
+            cg->str_count++;
+        }
+
+        /* Αποθήκευση $ra */
+        codegen_emit(cg, "\taddiu $sp, $sp, -4");
+        codegen_emit(cg, "\tsw $ra, 0($sp)\t# save $ra for _scanf");
+
+        /* Φόρτωση format string ως $a0 */
+        codegen_emit(cg, "\tla $a0, %s\t# scanf format", fmt_label);
+
+        /* Φόρτωση διευθύνσεων μεταβλητών σε $a1, $a2, ... */
+        int arg_num = 1;
+        item = node->left;
+        while (item)
+        {
+            if (item->kind == NODE_ID)
+            {
+                int is_global;
+                int offset = find_offset(cg, item->name, &is_global);
+                if (arg_num < 4)
+                {
+                    if (is_global)
+                        codegen_emit(cg, "\taddiu $a%d, $gp, %d\t# addr of %s",
+                                     arg_num, offset, item->name);
+                    else
+                        codegen_emit(cg, "\taddiu $a%d, $sp, %d\t# addr of %s",
+                                     arg_num, offset, item->name);
+                }
+                else
+                {
+                    char *tmp = codegen_alloc_reg(cg, TYPE_INT);
+                    if (is_global)
+                        codegen_emit(cg, "\taddiu %s, $gp, %d\t# addr of %s",
+                                     tmp, offset, item->name);
+                    else
+                        codegen_emit(cg, "\taddiu %s, $sp, %d\t# addr of %s",
+                                     tmp, offset, item->name);
+                    codegen_emit(cg, "\taddiu $sp, $sp, -4");
+                    codegen_emit(cg, "\tsw %s, 0($sp)", tmp);
+                    codegen_free_reg(cg, tmp);
+                }
+            }
+            item = item->next;
+            arg_num++;
+        }
+
+        /* Κλήση _scanf */
+        codegen_emit(cg, "\tjal _scanf\t# call _scanf");
+
+        /* Επαναφορά $ra */
+        codegen_emit(cg, "\tlw $ra, 0($sp)\t# restore $ra");
+        codegen_emit(cg, "\taddiu $sp, $sp, 4");
         break;
     }
 
@@ -894,47 +965,13 @@ void codegen_program(CodeGen *cg, ASTNode *root)
     if (!root)
         return;
 
-    /* #1 Τμήμα δεδομένων */
-    codegen_emit(cg, "\t.data");
+    /* Πρώτα παράγουμε τον κώδικα σε buffer */
+    /* Χρησιμοποιούμε tmp file */
+    FILE *tmp = tmpfile();
+    FILE *real_out = cg->out;
+    cg->out = tmp;
 
-    /* String constants */
-    for (int i = 0; i < cg->str_count; i++)
-    {
-        codegen_emit(cg, "%s:\t.asciiz %s",
-                     cg->str_labels[i], cg->str_values[i]);
-    }
-
-    /* Καθολικές μεταβλητές */
-    for (int i = 0; i < cg->dataspace->count; i++)
-    {
-        DataEntry *e = &cg->dataspace->entries[i];
-        if (e->storage == STORAGE_GLOBAL)
-        {
-            switch (e->type)
-            {
-            case TYPE_INT:
-                codegen_emit(cg, "%s:\t.word 0", e->name);
-                break;
-            case TYPE_FLOAT:
-                codegen_emit(cg, "%s:\t.float 0.0", e->name);
-                break;
-            case TYPE_CHAR:
-                codegen_emit(cg, "%s:\t.byte 0", e->name);
-                break;
-            case TYPE_STRING:
-                codegen_emit(cg, "%s:\t.space 256", e->name);
-                break;
-            default:
-                codegen_emit(cg, "%s:\t.word 0", e->name);
-            }
-        }
-    }
-
-    /* Τμήμα κώδικα */
-    codegen_emit(cg, "\t.text");
-    codegen_emit(cg, "\t.globl main");
-
-    /* #10 Παραγωγή κώδικα για κάθε συνάρτηση */
+    /* Παραγωγή κώδικα συναρτήσεων */
     for (int i = 0; i < cg->func_count; i++)
     {
         codegen_function(cg,
@@ -943,12 +980,11 @@ void codegen_program(CodeGen *cg, ASTNode *root)
                          cg->functions[i].param_count);
     }
 
-    /* Main */
+    /* Παραγωγή κώδικα main */
     codegen_emit(cg, "\nmain:\t# main function");
     strncpy(cg->current_func, "main", 255);
     codegen_free_all_regs(cg);
 
-    /* #1 Frame size για main */
     int local_size = 0;
     for (int i = 0; i < MAX_SYMBOLS; i++)
     {
@@ -956,9 +992,7 @@ void codegen_program(CodeGen *cg, ASTNode *root)
         while (s)
         {
             if (s->kind == SYM_VARIABLE && !s->is_static && s->depth > 0)
-            {
                 local_size += dataspace_type_size(s->type);
-            }
             s = s->next;
         }
     }
@@ -971,7 +1005,6 @@ void codegen_program(CodeGen *cg, ASTNode *root)
     codegen_emit(cg, "\taddiu $sp, $sp, -%d\t# allocate frame", frame_size);
     codegen_emit(cg, "\tsw $ra, %d($sp)\t# save $ra", frame_size - 4);
 
-    /* Παραγωγή κώδικα σώματος main */
     if (root->kind == NODE_COMPOUND)
     {
         ASTNode *stmt = root->left;
@@ -982,10 +1015,57 @@ void codegen_program(CodeGen *cg, ASTNode *root)
         }
     }
 
-    /* Epilogue main */
     codegen_emit(cg, "main_exit:");
     codegen_emit(cg, "\tlw $ra, %d($sp)\t# restore $ra", frame_size - 4);
     codegen_emit(cg, "\taddiu $sp, $sp, %d\t# deallocate frame", frame_size);
     codegen_emit(cg, "\tli $v0, 10\t# exit");
     codegen_emit(cg, "\tsyscall");
+
+    /* Τώρα εκτυπώνουμε .data με ΟΛΑ τα strings/formats */
+    cg->out = real_out;
+    fprintf(cg->out, "\t.data\n");
+
+    /* Format strings για printf/scanf */
+    for (int i = 0; i < cg->str_count; i++)
+    {
+        fprintf(cg->out, "%s:\t.asciiz %s\n",
+                cg->str_labels[i], cg->str_values[i]);
+    }
+
+    /* Καθολικές μεταβλητές */
+    for (int i = 0; i < cg->dataspace->count; i++)
+    {
+        DataEntry *e = &cg->dataspace->entries[i];
+        if (e->storage == STORAGE_GLOBAL)
+        {
+            switch (e->type)
+            {
+            case TYPE_INT:
+                fprintf(cg->out, "%s:\t.word 0\n", e->name);
+                break;
+            case TYPE_FLOAT:
+                fprintf(cg->out, "%s:\t.float 0.0\n", e->name);
+                break;
+            case TYPE_CHAR:
+                fprintf(cg->out, "%s:\t.byte 0\n", e->name);
+                break;
+            case TYPE_STRING:
+                fprintf(cg->out, "%s:\t.space 256\n", e->name);
+                break;
+            default:
+                fprintf(cg->out, "%s:\t.word 0\n", e->name);
+            }
+        }
+    }
+
+    /* Τμήμα κώδικα */
+    fprintf(cg->out, "\t.text\n");
+    fprintf(cg->out, "\t.globl main\n");
+
+    /* Αντιγραφή tmp buffer στην πραγματική έξοδο */
+    rewind(tmp);
+    int c;
+    while ((c = fgetc(tmp)) != EOF)
+        fputc(c, cg->out);
+    fclose(tmp);
 }
