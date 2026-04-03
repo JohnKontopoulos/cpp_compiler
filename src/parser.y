@@ -313,6 +313,8 @@ variabledef
             if (s && current_is_static)
                 s->is_static = 1;
 
+            /* Αποθήκευση διαστάσεων */
+            /* Προς το παρόν απλά δεσμεύουμε χώρο */
             StorageClass sc = (symtable->current_depth == 0 || current_is_static)
                               ? STORAGE_GLOBAL : STORAGE_LOCAL;
             DataEntry *e = dataspace_alloc(dataspace, $2, current_type,
