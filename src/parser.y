@@ -5,6 +5,7 @@
 #include "symtable.h"
 #include "ast.h"
 #include "dataspace.h"
+#include "codegen.h"
 
 ASTNode *ast_root = NULL;
 
@@ -12,6 +13,8 @@ extern int yylex();
 extern int yylineno;
 extern char *yytext;
 extern char current_line[];
+
+extern CodeGen *global_cg;
 
 void yyerror(const char *msg);
 int error_count = 0;
@@ -21,6 +24,7 @@ DataSpace *dataspace;
 
 SymType current_type      = TYPE_UNKNOWN;
 int     current_is_static = 0;
+int     in_parameter_list = 0;
 char    current_func_name[256] = "";
 int     current_param_index    = 0;
 %}
@@ -45,7 +49,6 @@ int     current_param_index    = 0;
 %type <node> in_list in_item out_list out_item
 %type <node> decl_statements
 
-/* Tokens */
 %token TYPEDEF CHAR INT FLOAT STRING CONST CLASS
 %token PRIVATE PROTECTED PUBLIC VOID STATIC UNION ENUM LIST
 %token CONTINUE BREAK IF ELSE WHILE FOR RETURN LENGTH
@@ -60,7 +63,6 @@ int     current_param_index    = 0;
 %token <sval> SCONST
 %token <sval> ID
 
-/* Προτεραιότητα τελεστών */
 %right ASSIGN
 %left COMMA
 %left OROP
@@ -72,7 +74,6 @@ int     current_param_index    = 0;
 %right NOTOP PREINCDEC UMINUS SIZEOP
 %left DOT LBRACK LPAREN POSTINCDEC
 
-/* Επίλυση dangling else */
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
 
@@ -80,7 +81,6 @@ int     current_param_index    = 0;
 
 %%
 
-/* ==================== ΠΡΟΓΡΑΜΜΑ ==================== */
 program
     : global_declarations main_function
         { 
@@ -105,12 +105,20 @@ global_declaration
             current_type = $1;
             strncpy(current_func_name, $3, 255);
             current_param_index = 0;
-            /* Εισαγωγή στον ΠΣ ως συνάρτηση προσωρινά */
+            in_parameter_list = 1;
+            Symbol *s = symtable_insert(symtable, $3, SYM_FUNCTION, (SymType)$1);
+            if (s) {
+                s->param_count = 0;
+                fprintf(stderr, "[SymTable] function '%s' return_type=%s\n",
+                        $3, symtype_to_str((SymType)$1));
+            }
         }
       global_rest
+        {
+            in_parameter_list = 0;
+        }
     ;
 
-/* ==================== GLOBAL REST ==================== */
 global_rest
     : dims initializer SEMI
     | dims initializer COMMA init_variabledefs SEMI
@@ -122,9 +130,16 @@ global_rest
             symtable_exit_scope(symtable);
             dataspace_exit_scope(dataspace, d);
             if ($6) {
-                fprintf(stderr, "\n=== AST for function '%s' ===\n", current_func_name);
+                fprintf(stderr, "\n=== AST for function '%s' ===\n",
+                        current_func_name);
                 ASTNode *stmt = $6;
                 while (stmt) { ast_print(stmt, 1); stmt = stmt->next; }
+                if (global_cg) {
+                    ASTNode *body = ast_make_compound($6);
+                    Symbol *s = symtable_lookup(symtable, current_func_name);
+                    int pc = s ? s->param_count : 0;
+                    codegen_add_function(global_cg, current_func_name, body, pc);
+                }
             }
         }
     | LPAREN parameter_list RPAREN SEMI
@@ -136,9 +151,14 @@ global_rest
             symtable_exit_scope(symtable);
             dataspace_exit_scope(dataspace, d);
             if ($5) {
-                fprintf(stderr, "\n=== AST for function '%s' ===\n", current_func_name);
+                fprintf(stderr, "\n=== AST for function '%s' ===\n",
+                        current_func_name);
                 ASTNode *stmt = $5;
                 while (stmt) { ast_print(stmt, 1); stmt = stmt->next; }
+                if (global_cg) {
+                    ASTNode *body = ast_make_compound($5);
+                    codegen_add_function(global_cg, current_func_name, body, 0);
+                }
             }
         }
     | LPAREN RPAREN SEMI
@@ -161,15 +181,13 @@ global_rest
         }
     ;
 
-/* ==================== TYPEDEF ==================== */
 typedef_declaration
     : TYPEDEF typename listspec ID dims SEMI
         {
             Symbol *s = symtable_insert(symtable, $4, SYM_TYPE, (SymType)$2);
-            if (s) {
+            if (s)
                 fprintf(stderr, "[SymTable] typedef '%s' = type %s\n",
                         $4, symtype_to_str((SymType)$2));
-            }
         }
     ;
 
@@ -201,7 +219,6 @@ dim
     | LBRACK RBRACK
     ;
 
-/* ==================== CONST ==================== */
 const_declaration
     : CONST standard_type
         { current_type = $2; }
@@ -238,7 +255,6 @@ init_values
     | init_value
     ;
 
-/* ==================== ENUM ==================== */
 enum_declaration
     : ENUM ID
         { symtable_insert(symtable, $2, SYM_ENUM, TYPE_ENUM); }
@@ -259,7 +275,6 @@ initializer
     | /* empty */
     ;
 
-/* ==================== CLASS ==================== */
 class_declaration
     : CLASS ID
         { symtable_insert(symtable, $2, SYM_CLASS, TYPE_CLASS); }
@@ -309,14 +324,18 @@ variabledefs
 variabledef
     : listspec ID dims
         {
-            Symbol *s = symtable_insert(symtable, $2, SYM_VARIABLE, current_type);
-            if (s && current_is_static)
-                s->is_static = 1;
+            SymKind kind = in_parameter_list ? SYM_PARAMETER : SYM_VARIABLE;
+            Symbol *s = symtable_insert(symtable, $2, kind, current_type);
+            if (s && current_is_static) s->is_static = 1;
 
-            /* Αποθήκευση διαστάσεων */
-            /* Προς το παρόν απλά δεσμεύουμε χώρο */
-            StorageClass sc = (symtable->current_depth == 0 || current_is_static)
-                              ? STORAGE_GLOBAL : STORAGE_LOCAL;
+            StorageClass sc;
+            if (in_parameter_list)
+                sc = STORAGE_PARAM;
+            else if (symtable->current_depth == 0 || current_is_static)
+                sc = STORAGE_GLOBAL;
+            else
+                sc = STORAGE_LOCAL;
+
             DataEntry *e = dataspace_alloc(dataspace, $2, current_type,
                                            sc, symtable->current_depth);
             if (s && e) s->offset = e->offset;
@@ -345,14 +364,12 @@ method
     | typename listspec ID LPAREN RPAREN SEMI
     ;
 
-/* ==================== UNION ==================== */
 union_declaration
     : UNION ID
         { symtable_insert(symtable, $2, SYM_UNION, TYPE_UNION); }
       union_body SEMI
     ;
 
-/* ==================== ΠΑΡΑΜΕΤΡΟΙ ==================== */
 parameter_types
     : parameter_types COMMA typename pass_list_dims
     | typename pass_list_dims
@@ -375,7 +392,6 @@ pass_variabledef
         {
             Symbol *func = symtable_lookup(symtable, current_func_name);
             if (func && current_param_index < MAX_PARAMS) {
-                strncpy(func->params[current_param_index].name, "", MAX_NAME-1);
                 func->params[current_param_index].type   = current_type;
                 func->params[current_param_index].by_ref = 0;
                 func->param_count++;
@@ -387,6 +403,10 @@ pass_variabledef
     | REFER ID
         {
             Symbol *s = symtable_insert(symtable, $2, SYM_PARAMETER, current_type);
+            DataEntry *e = dataspace_alloc(dataspace, $2, current_type,
+                                           STORAGE_PARAM, symtable->current_depth);
+            if (s && e) s->offset = e->offset;
+
             Symbol *func = symtable_lookup(symtable, current_func_name);
             if (func && current_param_index < MAX_PARAMS) {
                 strncpy(func->params[current_param_index].name, $2, MAX_NAME-1);
@@ -401,7 +421,6 @@ pass_variabledef
         }
     ;
 
-/* ==================== ΚΑΘΟΛΙΚΕΣ ΜΕΤΑΒΛΗΤΕΣ ==================== */
 init_variabledefs
     : init_variabledefs COMMA init_variabledef
     | init_variabledef
@@ -411,7 +430,6 @@ init_variabledef
     : variabledef initializer
     ;
 
-/* ==================== ΕΝΤΟΛΕΣ ==================== */
 decl_statements
     : declarations statements  { $$ = $2; }
     | declarations             { $$ = NULL; }
@@ -454,7 +472,12 @@ statement
     | CONTINUE SEMI         { $$ = ast_make_node_simple(NODE_CONTINUE); }
     | BREAK SEMI            { $$ = ast_make_node_simple(NODE_BREAK); }
     | SEMI                  { $$ = NULL; }
-    | error SEMI            { $$ = NULL; fprintf(stderr, "Error recovery at line %d\n>>> Line %d: %s\n", yylineno, yylineno, current_line); }
+    | error SEMI
+        { 
+            $$ = NULL;
+            fprintf(stderr, "Error recovery at line %d\n>>> Line %d: %s\n",
+                    yylineno, yylineno, current_line);
+        }
     ;
 
 expression_statement
@@ -531,7 +554,6 @@ comp_statement
         }
     ;
 
-/* ==================== MAIN ==================== */
 main_function
     : main_header LBRACE
         { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
@@ -548,7 +570,6 @@ main_header
     : INT MAIN LPAREN RPAREN
     ;
 
-/* ==================== ΕΚΦΡΑΣΕΙΣ ==================== */
 general_expression
     : general_expression COMMA general_expression
         { $$ = ast_make_binop(",", $1, $3); }

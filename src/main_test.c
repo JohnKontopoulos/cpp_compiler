@@ -8,8 +8,12 @@
 extern int yyparse();
 extern FILE *yyin;
 extern SymTable *symtable;
-extern ASTNode *ast_root;
 extern DataSpace *dataspace;
+extern ASTNode *ast_root;
+extern int error_count;
+
+/* Global codegen για χρήση από τον parser */
+CodeGen *global_cg = NULL;
 
 static void print_ast(ASTNode *root)
 {
@@ -53,35 +57,7 @@ int main(int argc, char *argv[])
     symtable = symtable_create();
     dataspace = dataspace_create();
 
-    yyparse();
-    fclose(yyin);
-
-    print_ast(ast_root);
-
-    /* Αν υπάρχουν συντακτικά σφάλματα - σταματάμε */
-    extern int error_count;
-    if (error_count > 0)
-    {
-        fprintf(stderr, "Aborting: %d syntax error(s) found.\n", error_count);
-        ast_free(ast_root);
-        symtable_destroy(symtable);
-        dataspace_destroy(dataspace);
-        return 1;
-    }
-
-    semantic_check_program(ast_root, symtable);
-
-    /* Αν υπάρχουν σημασιολογικά σφάλματα - σταματάμε */
-    if (sem_error_count > 0)
-    {
-        fprintf(stderr, "Aborting: %d semantic error(s) found.\n", sem_error_count);
-        ast_free(ast_root);
-        symtable_destroy(symtable);
-        dataspace_destroy(dataspace);
-        return 1;
-    }
-
-    /* Παραγωγή κώδικα */
+    /* Αρχείο εξόδου */
     FILE *out = stdout;
     if (argc >= 3)
     {
@@ -93,9 +69,48 @@ int main(int argc, char *argv[])
         }
     }
 
-    CodeGen *cg = codegen_create(out, symtable, dataspace);
-    codegen_program(cg, ast_root);
-    codegen_destroy(cg);
+    /* Δημιουργία codegen ΠΡΙΝ το parsing */
+    global_cg = codegen_create(out, symtable, dataspace);
+
+    /* Parsing */
+    yyparse();
+    fclose(yyin);
+
+    /* Εκτύπωση ΑΣΔ */
+    print_ast(ast_root);
+
+    /* Έλεγχος συντακτικών σφαλμάτων */
+    if (error_count > 0)
+    {
+        fprintf(stderr, "Aborting: %d syntax error(s) found.\n", error_count);
+        ast_free(ast_root);
+        symtable_destroy(symtable);
+        dataspace_destroy(dataspace);
+        codegen_destroy(global_cg);
+        if (out != stdout)
+            fclose(out);
+        return 1;
+    }
+
+    /* Σημασιολογικός έλεγχος */
+    semantic_check_program(ast_root, symtable);
+
+    /* Έλεγχος σημασιολογικών σφαλμάτων */
+    if (sem_error_count > 0)
+    {
+        fprintf(stderr, "Aborting: %d semantic error(s) found.\n", sem_error_count);
+        ast_free(ast_root);
+        symtable_destroy(symtable);
+        dataspace_destroy(dataspace);
+        codegen_destroy(global_cg);
+        if (out != stdout)
+            fclose(out);
+        return 1;
+    }
+
+    /* Παραγωγή κώδικα */
+    codegen_program(global_cg, ast_root);
+    codegen_destroy(global_cg);
 
     if (out != stdout)
         fclose(out);
