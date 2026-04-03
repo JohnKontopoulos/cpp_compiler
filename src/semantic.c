@@ -260,10 +260,10 @@ void semantic_check_program(ASTNode *root, SymTable *st)
 {
     if (!root)
         return;
-    printf("\n========== Semantic Analysis ==========\n");
+    fprintf(stderr, "\n========== Semantic Analysis ==========\n");
     semantic_check_stmt(root, st);
     if (sem_error_count == 0)
-        printf("No semantic errors found!\n");
+        fprintf(stderr, "No semantic errors found!\n");
     else
-        printf("%d semantic error(s) found.\n", sem_error_count);
+        fprintf(stderr, "%d semantic error(s) found.\n", sem_error_count);
 }

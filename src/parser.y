@@ -81,7 +81,7 @@ int current_is_static = 0;
 program
     : global_declarations main_function
         { 
-            printf("Program parsed successfully!\n");
+            fprintf(stderr, "Program parsed successfully!\n");
             ast_root = $2;
         }
     ;

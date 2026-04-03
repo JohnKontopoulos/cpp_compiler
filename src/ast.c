@@ -240,43 +240,42 @@ static void ast_print_node(ASTNode *node, int indent)
         return;
 
     for (int i = 0; i < indent; i++)
-        printf("  ");
+        fprintf(stderr, "  ");
 
-    printf("[%s]", nodekind_str(node->kind));
+    fprintf(stderr, "[%s]", nodekind_str(node->kind));
 
     switch (node->kind)
     {
     case NODE_ICONST:
-        printf(" %d", node->val.ival);
+        fprintf(stderr, " %d", node->val.ival);
         break;
     case NODE_FCONST:
-        printf(" %f", node->val.fval);
+        fprintf(stderr, " %f", node->val.fval);
         break;
     case NODE_CCONST:
-        printf(" '%c'", node->val.cval);
+        fprintf(stderr, " '%c'", node->val.cval);
         break;
     case NODE_SCONST:
-        printf(" \"%s\"", node->val.sval);
+        fprintf(stderr, " \"%s\"", node->val.sval);
         break;
     case NODE_ID:
-        printf(" %s", node->name);
+        fprintf(stderr, " %s", node->name);
         break;
     case NODE_BINOP:
     case NODE_UNOP:
-        printf(" %s", node->name);
+        fprintf(stderr, " %s", node->name);
         break;
     case NODE_CALL:
-        printf(" %s()", node->name ? node->name : "?");
+        fprintf(stderr, " %s()", node->name ? node->name : "?");
         break;
     case NODE_VAR_DECL:
-        printf(" %s:%s", node->name, symtype_to_str(node->type));
+        fprintf(stderr, " %s:%s", node->name, symtype_to_str(node->type));
         break;
     default:
         break;
     }
-    printf(" <%s>\n", symtype_to_str(node->type));
+    fprintf(stderr, " <%s>\n", symtype_to_str(node->type));
 
-    /* Εκτύπωση παιδιών ΜΟΝΟ - ποτέ next */
     ast_print_node(node->left, indent + 1);
     ast_print_node(node->right, indent + 1);
     ast_print_node(node->extra, indent + 1);
@@ -290,8 +289,8 @@ void ast_print(ASTNode *node, int indent)
     if (node->kind == NODE_COMPOUND)
     {
         for (int i = 0; i < indent; i++)
-            printf("  ");
-        printf("[COMPOUND] <unknown>\n");
+            fprintf(stderr, "  ");
+        fprintf(stderr, "[COMPOUND] <unknown>\n"); /* ← προσθήκη \n */
         ASTNode *stmt = node->left;
         while (stmt)
         {

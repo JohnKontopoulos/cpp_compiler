@@ -93,12 +93,11 @@ void dataspace_exit_scope(DataSpace *ds, int depth)
 
 void dataspace_print_scope(DataSpace *ds, int depth)
 {
-    printf("\n[DataSpace] Scope depth %d:\n", depth);
-    printf("%-20s %-10s %-10s %-8s %s\n",
-           "Name", "Type", "Storage", "Offset", "Size");
-    printf("%-20s %-10s %-10s %-8s %s\n",
-           "----", "----", "-------", "------", "----");
-
+    fprintf(stderr, "\n[DataSpace] Scope depth %d:\n", depth);
+    fprintf(stderr, "%-20s %-10s %-10s %-8s %s\n",
+            "Name", "Type", "Storage", "Offset", "Size");
+    fprintf(stderr, "%-20s %-10s %-10s %-8s %s\n",
+            "----", "----", "-------", "------", "----");
     int found = 0;
     for (int i = 0; i < ds->count; i++)
     {
@@ -108,17 +107,14 @@ void dataspace_print_scope(DataSpace *ds, int depth)
             const char *storage_str =
                 e->storage == STORAGE_GLOBAL ? "global" : e->storage == STORAGE_PARAM ? "param"
                                                                                       : "local";
-            printf("%-20s %-10s %-10s %-8d %d\n",
-                   e->name,
-                   symtype_to_str(e->type),
-                   storage_str,
-                   e->offset,
-                   e->size);
+            fprintf(stderr, "%-20s %-10s %-10s %-8d %d\n",
+                    e->name, symtype_to_str(e->type),
+                    storage_str, e->offset, e->size);
             found = 1;
         }
     }
     if (!found)
-        printf("(empty)\n");
+        fprintf(stderr, "(empty)\n");
 }
 
 void dataspace_print(DataSpace *ds)

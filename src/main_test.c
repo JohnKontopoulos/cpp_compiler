@@ -13,15 +13,15 @@ extern DataSpace *dataspace;
 
 static void print_ast(ASTNode *root)
 {
-    printf("\n==================== AST ====================\n");
+    fprintf(stderr, "\n==================== AST ====================\n");
     if (!root)
     {
-        printf("(empty)\n");
+        fprintf(stderr, "(empty)\n");
         return;
     }
     if (root->kind == NODE_COMPOUND)
     {
-        printf("[COMPOUND] <unknown>\n");
+        fprintf(stderr, "[COMPOUND] <unknown>\n");
         ASTNode *stmt = root->left;
         while (stmt)
         {
@@ -71,7 +71,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("\n==================== MIPS Code ====================\n");
     CodeGen *cg = codegen_create(out, symtable, dataspace);
     codegen_program(cg, ast_root);
     codegen_destroy(cg);

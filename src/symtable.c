@@ -38,16 +38,14 @@ void symtable_destroy(SymTable *st)
 void symtable_enter_scope(SymTable *st)
 {
     st->current_depth++;
-    printf("[Scope] Entering depth %d\n", st->current_depth);
+    fprintf(stderr, "[Scope] Entering depth %d\n", st->current_depth);
 }
 
 void symtable_exit_scope(SymTable *st)
 {
-    printf("\n[Scope] Exiting depth %d - Symbols:\n", st->current_depth);
-    printf("%-20s %-12s %-12s %s\n", "Name", "Kind", "Type", "Depth");
-    printf("%-20s %-12s %-12s %s\n", "----", "----", "----", "-----");
-
-    /* Εκτύπωση συμβόλων - ΔΕΝ διαγράφουμε */
+    fprintf(stderr, "\n[Scope] Exiting depth %d - Symbols:\n", st->current_depth);
+    fprintf(stderr, "%-20s %-12s %-12s %s\n", "Name", "Kind", "Type", "Depth");
+    fprintf(stderr, "%-20s %-12s %-12s %s\n", "----", "----", "----", "-----");
     for (int i = 0; i < MAX_SYMBOLS; i++)
     {
         Symbol *s = st->table[i];
@@ -55,17 +53,17 @@ void symtable_exit_scope(SymTable *st)
         {
             if (s->depth == st->current_depth)
             {
-                printf("%-20s %-12s %-12s %d\n",
-                       s->name,
-                       symkind_to_str(s->kind),
-                       symtype_to_str(s->type),
-                       s->depth);
+                fprintf(stderr, "%-20s %-12s %-12s %d\n",
+                        s->name,
+                        symkind_to_str(s->kind),
+                        symtype_to_str(s->type),
+                        s->depth);
             }
             s = s->next;
         }
     }
     st->current_depth--;
-    printf("[Scope] Back to depth %d\n\n", st->current_depth);
+    fprintf(stderr, "[Scope] Back to depth %d\n\n", st->current_depth);
 }
 
 Symbol *symtable_insert(SymTable *st, const char *name, SymKind kind, SymType type)
