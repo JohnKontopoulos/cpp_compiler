@@ -70,15 +70,21 @@ void symtable_exit_scope(SymTable *st)
 
 Symbol *symtable_insert(SymTable *st, const char *name, SymKind kind, SymType type)
 {
+    if (!name || strlen(name) == 0)
+        return NULL;
+
     /* Έλεγχος αν υπάρχει ήδη στην ίδια εμβέλεια */
-    if (symtable_lookup_current(st, name))
+    Symbol *existing = symtable_lookup_current(st, name);
+    if (existing)
     {
-        fprintf(stderr, "Error: '%s' already declared in this scope\n", name);
+        fprintf(stderr, "Semantic error: '%s' already declared in this scope (depth %d)\n",
+                name, st->current_depth);
         return NULL;
     }
 
     unsigned int h = hash(name);
     Symbol *s = (Symbol *)malloc(sizeof(Symbol));
+    memset(s, 0, sizeof(Symbol));
     strncpy(s->name, name, MAX_NAME - 1);
     s->name[MAX_NAME - 1] = '\0';
     s->kind = kind;

@@ -20,7 +20,6 @@ int types_compatible(SymType t1, SymType t2)
 {
     if (t1 == t2)
         return 1;
-    /* αριθμητικοί τύποι είναι συμβατοί μεταξύ τους */
     if ((t1 == TYPE_INT || t1 == TYPE_FLOAT) &&
         (t2 == TYPE_INT || t2 == TYPE_FLOAT))
         return 1;
@@ -77,7 +76,6 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
         SymType lt = semantic_check_expr(node->left, st);
         SymType rt = semantic_check_expr(node->right, st);
 
-        /* Λογικοί τελεστές */
         if (strcmp(node->name, "||") == 0 ||
             strcmp(node->name, "&&") == 0)
         {
@@ -89,7 +87,6 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_INT;
         }
 
-        /* Τελεστές σύγκρισης */
         if (strcmp(node->name, "==") == 0 ||
             strcmp(node->name, "<>") == 0)
         {
@@ -99,7 +96,6 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_INT;
         }
 
-        /* Αριθμητικοί τελεστές */
         if (!types_compatible(lt, rt))
             sem_error("incompatible types in expression", node->name);
         node->type = result_type(lt, rt);
@@ -140,7 +136,29 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_UNKNOWN;
         }
         if (s->kind != SYM_FUNCTION)
+        {
             sem_error("not a function", node->name);
+            node->type = TYPE_UNKNOWN;
+            return TYPE_UNKNOWN;
+        }
+
+        int actual_count = 0;
+        ASTNode *arg = node->left;
+        while (arg)
+        {
+            semantic_check_expr(arg, st);
+            actual_count++;
+            arg = arg->next;
+        }
+
+        if (s->param_count > 0 && actual_count != s->param_count)
+        {
+            fprintf(stderr,
+                    "Semantic error: function '%s' expects %d params but got %d\n",
+                    node->name, s->param_count, actual_count);
+            sem_error_count++;
+        }
+
         node->type = s->type;
         return s->type;
     }

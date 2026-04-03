@@ -1,4 +1,3 @@
-
 %{
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,8 +5,6 @@
 #include "symtable.h"
 #include "ast.h"
 #include "dataspace.h"
-
-DataSpace *dataspace;
 
 ASTNode *ast_root = NULL;
 
@@ -19,6 +16,7 @@ void yyerror(const char *msg);
 int error_count = 0;
 
 SymTable *symtable;
+DataSpace *dataspace;
 
 SymType current_type = TYPE_UNKNOWN;
 int current_is_static = 0;
@@ -107,24 +105,50 @@ global_rest
     : dims initializer SEMI
     | dims initializer COMMA init_variabledefs SEMI
     | LPAREN parameter_list RPAREN LBRACE
-        { symtable_enter_scope(symtable); }
+        { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
       decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
+        { 
+            int d = symtable->current_depth;
+            symtable_exit_scope(symtable);
+            dataspace_exit_scope(dataspace, d);
+            if ($6) {
+                printf("\n=== AST for function ===\n");
+                ASTNode *stmt = $6;
+                while (stmt) { ast_print(stmt, 1); stmt = stmt->next; }
+            }
+        }
     | LPAREN parameter_list RPAREN SEMI
     | LPAREN RPAREN LBRACE
-        { symtable_enter_scope(symtable); }
+        { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
       decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
+        { 
+            int d = symtable->current_depth;
+            symtable_exit_scope(symtable);
+            dataspace_exit_scope(dataspace, d);
+            if ($5) {
+                printf("\n=== AST for function ===\n");
+                ASTNode *stmt = $5;
+                while (stmt) { ast_print(stmt, 1); stmt = stmt->next; }
+            }
+        }
     | LPAREN RPAREN SEMI
     | LPAREN parameter_types RPAREN SEMI
     | METH ID LPAREN parameter_list RPAREN LBRACE
-        { symtable_enter_scope(symtable); }
+        { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
       decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
+        { 
+            int d = symtable->current_depth;
+            symtable_exit_scope(symtable);
+            dataspace_exit_scope(dataspace, d);
+        }
     | METH ID LPAREN RPAREN LBRACE
-        { symtable_enter_scope(symtable); }
+        { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
       decl_statements RBRACE
-        { symtable_exit_scope(symtable); }
+        { 
+            int d = symtable->current_depth;
+            symtable_exit_scope(symtable);
+            dataspace_exit_scope(dataspace, d);
+        }
     ;
 
 /* ==================== TYPEDEF ==================== */
@@ -258,11 +282,10 @@ variabledef
             Symbol *s = symtable_insert(symtable, $2, SYM_VARIABLE, current_type);
             if (s && current_is_static)
                 s->is_static = 1;
-            
-            /* Δέσμευση χώρου δεδομένων */
-            StorageClass sc = (symtable->current_depth == 0 || current_is_static) 
+
+            StorageClass sc = (symtable->current_depth == 0 || current_is_static)
                               ? STORAGE_GLOBAL : STORAGE_LOCAL;
-            DataEntry *e = dataspace_alloc(dataspace, $2, current_type, 
+            DataEntry *e = dataspace_alloc(dataspace, $2, current_type,
                                            sc, symtable->current_depth);
             if (s && e) s->offset = e->offset;
         }
@@ -310,12 +333,18 @@ pass_list_dims
 
 parameter_list
     : parameter_list COMMA typename pass_variabledef
+        { current_type = $3; }
     | typename pass_variabledef
+        { current_type = $1; }
     ;
 
 pass_variabledef
     : variabledef
     | REFER ID
+        {
+            Symbol *s = symtable_insert(symtable, $2, SYM_PARAMETER, current_type);
+            if (s) s->is_static = 0;
+        }
     ;
 
 /* ==================== ΚΑΘΟΛΙΚΕΣ ΜΕΤΑΒΛΗΤΕΣ ==================== */
@@ -438,10 +467,7 @@ out_item
 
 comp_statement
     : LBRACE
-        { 
-            symtable_enter_scope(symtable);
-            dataspace_enter_scope(dataspace);
-        }
+        { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
       decl_statements RBRACE
         {
             int d = symtable->current_depth;
@@ -454,14 +480,12 @@ comp_statement
 /* ==================== MAIN ==================== */
 main_function
     : main_header LBRACE
-        { 
-            symtable_enter_scope(symtable);
-            dataspace_enter_scope(dataspace);
-        }
+        { symtable_enter_scope(symtable); dataspace_enter_scope(dataspace); }
       decl_statements RBRACE
         { 
+            int d = symtable->current_depth;
             symtable_exit_scope(symtable);
-            dataspace_exit_scope(dataspace, 1);
+            dataspace_exit_scope(dataspace, d);
             $$ = ast_make_compound($4);
         }
     ;
