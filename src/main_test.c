@@ -57,7 +57,29 @@ int main(int argc, char *argv[])
     fclose(yyin);
 
     print_ast(ast_root);
+
+    /* Αν υπάρχουν συντακτικά σφάλματα - σταματάμε */
+    extern int error_count;
+    if (error_count > 0)
+    {
+        fprintf(stderr, "Aborting: %d syntax error(s) found.\n", error_count);
+        ast_free(ast_root);
+        symtable_destroy(symtable);
+        dataspace_destroy(dataspace);
+        return 1;
+    }
+
     semantic_check_program(ast_root, symtable);
+
+    /* Αν υπάρχουν σημασιολογικά σφάλματα - σταματάμε */
+    if (sem_error_count > 0)
+    {
+        fprintf(stderr, "Aborting: %d semantic error(s) found.\n", sem_error_count);
+        ast_free(ast_root);
+        symtable_destroy(symtable);
+        dataspace_destroy(dataspace);
+        return 1;
+    }
 
     /* Παραγωγή κώδικα */
     FILE *out = stdout;
