@@ -5,6 +5,9 @@
 #include <string.h>
 #include "symtable.h"
 #include "ast.h"
+#include "dataspace.h"
+
+DataSpace *dataspace;
 
 ASTNode *ast_root = NULL;
 
@@ -255,6 +258,13 @@ variabledef
             Symbol *s = symtable_insert(symtable, $2, SYM_VARIABLE, current_type);
             if (s && current_is_static)
                 s->is_static = 1;
+            
+            /* Δέσμευση χώρου δεδομένων */
+            StorageClass sc = (symtable->current_depth == 0 || current_is_static) 
+                              ? STORAGE_GLOBAL : STORAGE_LOCAL;
+            DataEntry *e = dataspace_alloc(dataspace, $2, current_type, 
+                                           sc, symtable->current_depth);
+            if (s && e) s->offset = e->offset;
         }
     ;
 
@@ -428,10 +438,15 @@ out_item
 
 comp_statement
     : LBRACE
-        { symtable_enter_scope(symtable); }
+        { 
+            symtable_enter_scope(symtable);
+            dataspace_enter_scope(dataspace);
+        }
       decl_statements RBRACE
         {
+            int d = symtable->current_depth;
             symtable_exit_scope(symtable);
+            dataspace_exit_scope(dataspace, d);
             $$ = ast_make_compound($3);
         }
     ;
@@ -439,10 +454,14 @@ comp_statement
 /* ==================== MAIN ==================== */
 main_function
     : main_header LBRACE
-        { symtable_enter_scope(symtable); }
+        { 
+            symtable_enter_scope(symtable);
+            dataspace_enter_scope(dataspace);
+        }
       decl_statements RBRACE
         { 
             symtable_exit_scope(symtable);
+            dataspace_exit_scope(dataspace, 1);
             $$ = ast_make_compound($4);
         }
     ;
