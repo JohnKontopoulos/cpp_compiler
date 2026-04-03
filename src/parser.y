@@ -11,6 +11,8 @@ ASTNode *ast_root = NULL;
 extern int yylex();
 extern int yylineno;
 extern char *yytext;
+extern char current_line[];
+extern int line_num;
 
 void yyerror(const char *msg);
 int error_count = 0;
@@ -586,6 +588,7 @@ listexpression
 
 void yyerror(const char *msg) {
     fprintf(stderr, "Syntax error at line %d: %s\n", yylineno, msg);
+    fprintf(stderr, ">>> Line %d: %s\n", yylineno, current_line);
     error_count++;
     if (error_count >= 5) {
         fprintf(stderr, "Too many errors (5), aborting.\n");
