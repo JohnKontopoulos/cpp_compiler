@@ -1,3 +1,22 @@
+/*
+ * codegen.h
+ * Γεννήτορας Τελικού Κώδικα (ΓΤΚ) για τον μεταγλωττιστή CPP
+ *
+ * Παράγει κώδικα συμβολικής γλώσσας MIPS από το ΑΣΔ.
+ *
+ * Αρχιτεκτονική MIPS που χρησιμοποιείται:
+ * - $t0-$t7: προσωρινοί καταχωρητές ακεραίων (caller-saved)
+ * - $f0,$f2,...: προσωρινοί καταχωρητές float
+ * - $a0-$a3: καταχωρητές παραμέτρων
+ * - $v0: καταχωρητής επιστροφής
+ * - $sp: δείκτης στοίβας (τοπικές μεταβλητές)
+ * - $gp: δείκτης καθολικών δεδομένων
+ * - $ra: διεύθυνση επιστροφής
+ * - $fp: frame pointer
+ *
+ * Είσοδος/Έξοδος: μέσω _printf/_scanf με format strings
+ */
+
 #ifndef CODEGEN_H
 #define CODEGEN_H
 
@@ -6,57 +25,62 @@
 #include "symtable.h"
 #include "dataspace.h"
 
-/* Καταχωρητές MIPS */
-#define MAX_REGS 8
-#define MAX_FUNCTIONS 64
+/* ==================== ΣΤΑΘΕΡΕΣ ==================== */
+#define MAX_REGS 8       /* $t0-$t7 και $f0,$f2,...,$f14 */
+#define MAX_FUNCTIONS 64 /* Μέγιστος αριθμός συναρτήσεων */
 
-/* Περιγραφή καταχωρητή */
+/* ==================== ΚΑΤΑΧΩΡΗΤΕΣ ==================== */
+/* Περιγραφή κατάστασης καταχωρητή */
 typedef struct
 {
-    char name[16];
-    int in_use;
-    char var_name[256];
+    char name[16];      /* Όνομα καταχωρητή (π.χ. "$t0") */
+    int in_use;         /* 1 αν χρησιμοποιείται, 0 αν ελεύθερος */
+    char var_name[256]; /* Μεταβλητή που περιέχει (για debugging) */
 } Register;
 
-/* Αποθήκευση συνάρτησης για παραγωγή κώδικα */
+/* ==================== ΣΥΝΑΡΤΗΣΕΙΣ ==================== */
+/* Αποθήκευση ορισμού συνάρτησης για παραγωγή κώδικα */
 typedef struct
 {
-    char name[256];
-    ASTNode *body;
-    int param_count;
+    char name[256];  /* Όνομα συνάρτησης */
+    ASTNode *body;   /* Σώμα συνάρτησης (ΑΣΔ) */
+    int param_count; /* Αριθμός παραμέτρων */
 } FuncDef;
 
-/* Γεννήτορας κώδικα */
+/* ==================== ΓΕΝΝΗΤΟΡΑΣ ΚΩΔΙΚΑ ==================== */
 typedef struct
 {
-    FILE *out;
-    SymTable *symtable;
-    DataSpace *dataspace;
+    FILE *out;            /* Αρχείο εξόδου για MIPS κώδικα */
+    SymTable *symtable;   /* Πίνακας Συμβόλων */
+    DataSpace *dataspace; /* Χώρος Δεδομένων */
 
-    Register t_regs[MAX_REGS]; /* $t0-$t7 */
-    Register f_regs[MAX_REGS]; /* $f0,$f2,...,$f14 */
+    /* Καταχωρητές ακεραίων $t0-$t7 */
+    Register t_regs[MAX_REGS];
+    /* Καταχωρητές float $f0,$f2,...,$f14 */
+    Register f_regs[MAX_REGS];
 
-    int label_count;
-    int temp_count;
+    int label_count; /* Μετρητής για παραγωγή μοναδικών labels */
+    int temp_count;  /* Μετρητής προσωρινών μεταβλητών */
 
-    char current_func[256];
-    int local_size;
+    char current_func[256]; /* Όνομα τρέχουσας συνάρτησης */
+    int local_size;         /* Μέγεθος τοπικού χώρου δεδομένων */
 
-    /* Αποθήκευση συναρτήσεων */
+    /* Συναρτήσεις προς παραγωγή κώδικα */
     FuncDef functions[MAX_FUNCTIONS];
     int func_count;
 
-    /* String constants για .data section */
-    char str_labels[256][64];
-    char str_values[256][512];
-    int str_count;
+    /* String/format constants για .data section */
+    char str_labels[256][64];  /* Labels string constants */
+    char str_values[256][512]; /* Τιμές string constants */
+    int str_count;             /* Πλήθος string constants */
 } CodeGen;
 
+/* ==================== ΔΙΕΠΑΦΗ ==================== */
 /* Δημιουργία/καταστροφή */
 CodeGen *codegen_create(FILE *out, SymTable *st, DataSpace *ds);
 void codegen_destroy(CodeGen *cg);
 
-/* Παραγωγή κώδικα */
+/* Κύριες συναρτήσεις παραγωγής κώδικα */
 void codegen_program(CodeGen *cg, ASTNode *root);
 void codegen_function(CodeGen *cg, const char *name,
                       ASTNode *body, int param_count);
