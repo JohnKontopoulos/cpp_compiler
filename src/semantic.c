@@ -1,31 +1,63 @@
+/*
+ * semantic.c
+ * Υλοποίηση Σημασιολογικού Αναλυτή για τον μεταγλωττιστή CPP
+ *
+ * Εκτελεί σημασιολογικούς ελέγχους στο ΑΣΔ:
+ * 1. Έλεγχος τύπων εκφράσεων
+ * 2. Έλεγχος δηλώσεων (undeclared identifiers)
+ * 3. Αυτόματη εισαγωγή cast nodes (int↔float)
+ * 4. Έλεγχος κλήσεων συναρτήσεων
+ * 5. Έλεγχος συνθηκών δομών ελέγχου
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "semantic.h"
 
+/* Μετρητής σημασιολογικών σφαλμάτων */
 int sem_error_count = 0;
 
+/*
+ * sem_error - Εκτύπωση μηνύματος σφάλματος
+ * Αυξάνει τον μετρητή σφαλμάτων sem_error_count
+ */
 void sem_error(const char *msg, const char *name)
 {
-    fprintf(stderr, "Semantic error: %s '%s'\n", msg, name ? name : "");
+    fprintf(stderr, "Semantic error: %s '%s'\n",
+            msg, name ? name : "");
     sem_error_count++;
 }
 
+/*
+ * sem_warning - Εκτύπωση προειδοποίησης
+ * Δεν αυξάνει τον μετρητή σφαλμάτων
+ */
 void sem_warning(const char *msg, const char *name)
 {
-    fprintf(stderr, "Semantic warning: %s '%s'\n", msg, name ? name : "");
+    fprintf(stderr, "Semantic warning: %s '%s'\n",
+            msg, name ? name : "");
 }
 
+/*
+ * types_compatible - Έλεγχος συμβατότητας δύο τύπων
+ * Συμβατοί είναι: ίδιοι τύποι ή αριθμητικοί (int/float)
+ */
 int types_compatible(SymType t1, SymType t2)
 {
     if (t1 == t2)
         return 1;
+    /* int και float είναι συμβατοί (με αυτόματη μετατροπή) */
     if ((t1 == TYPE_INT || t1 == TYPE_FLOAT) &&
         (t2 == TYPE_INT || t2 == TYPE_FLOAT))
         return 1;
     return 0;
 }
 
+/*
+ * result_type - Τύπος αποτελέσματος αριθμητικής πράξης
+ * Ακολουθεί κανόνες προώθησης τύπων: float > int > char
+ */
 SymType result_type(SymType t1, SymType t2)
 {
     if (t1 == TYPE_FLOAT || t2 == TYPE_FLOAT)
@@ -35,6 +67,17 @@ SymType result_type(SymType t1, SymType t2)
     return t1;
 }
 
+/*
+ * semantic_check_expr - Σημασιολογικός έλεγχος έκφρασης
+ *
+ * Διαπερνά αναδρομικά το ΑΣΔ και:
+ * - Ελέγχει ότι τα αναγνωριστικά έχουν δηλωθεί
+ * - Ελέγχει συμβατότητα τύπων
+ * - Εισάγει cast nodes για αυτόματες μετατροπές
+ * - Υπολογίζει και αποθηκεύει τον τύπο κάθε κόμβου
+ *
+ * Επιστρέφει: τύπος αποτελέσματος της έκφρασης
+ */
 SymType semantic_check_expr(ASTNode *node, SymTable *st)
 {
     if (!node)
@@ -42,6 +85,8 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
 
     switch (node->kind)
     {
+
+    /* ===== Σταθερές: ο τύπος είναι γνωστός ===== */
     case NODE_ICONST:
         node->type = TYPE_INT;
         return TYPE_INT;
@@ -58,6 +103,7 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
         node->type = TYPE_STRING;
         return TYPE_STRING;
 
+    /* ===== Αναγνωριστικό: αναζήτηση στον ΠΣ ===== */
     case NODE_ID:
     {
         Symbol *s = symtable_lookup(st, node->name);
@@ -71,11 +117,13 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
         return s->type;
     }
 
+    /* ===== Δυαδικός τελεστής ===== */
     case NODE_BINOP:
     {
         SymType lt = semantic_check_expr(node->left, st);
         SymType rt = semantic_check_expr(node->right, st);
 
+        /* Λογικοί τελεστές: απαιτούν int */
         if (strcmp(node->name, "||") == 0 ||
             strcmp(node->name, "&&") == 0)
         {
@@ -87,6 +135,7 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_INT;
         }
 
+        /* Τελεστές σύγκρισης: επιστρέφουν int */
         if (strcmp(node->name, "==") == 0 ||
             strcmp(node->name, "<>") == 0)
         {
@@ -96,15 +145,18 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_INT;
         }
 
+        /* Αριθμητικοί τελεστές */
         if (!types_compatible(lt, rt))
             sem_error("incompatible types in expression", node->name);
         node->type = result_type(lt, rt);
         return node->type;
     }
 
+    /* ===== Μοναδιαίος τελεστής ===== */
     case NODE_UNOP:
     {
         SymType t = semantic_check_expr(node->left, st);
+        /* Λογική άρνηση: απαιτεί int */
         if (strcmp(node->name, "!") == 0)
         {
             if (t != TYPE_INT)
@@ -116,6 +168,7 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
         return t;
     }
 
+    /* ===== Ανάθεση: έλεγχος και cast ===== */
     case NODE_ASSIGN:
     {
         SymType lt = semantic_check_expr(node->left, st);
@@ -127,10 +180,10 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
         }
         else if (lt != rt)
         {
-            /* Προσθήκη cast node αν χρειάζεται */
+            /* Εισαγωγή cast node για αυτόματη μετατροπή */
             if (lt == TYPE_FLOAT && rt == TYPE_INT)
             {
-                /* int → float: αυτόματη μετατροπή */
+                /* int → float */
                 ASTNode *cast = ast_make_cast(node->right, TYPE_FLOAT);
                 node->right = cast;
                 fprintf(stderr, "[Semantic] cast int→float added\n");
@@ -147,6 +200,7 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
         return lt;
     }
 
+    /* ===== Κλήση συνάρτησης ===== */
     case NODE_CALL:
     {
         Symbol *s = symtable_lookup(st, node->name);
@@ -163,6 +217,7 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_UNKNOWN;
         }
 
+        /* Έλεγχος αριθμού παραμέτρων */
         int actual_count = 0;
         ASTNode *arg = node->left;
         while (arg)
@@ -189,6 +244,16 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
     }
 }
 
+/*
+ * semantic_check_stmt - Σημασιολογικός έλεγχος εντολής
+ *
+ * Ελέγχει κάθε τύπο εντολής:
+ * - Εκφράσεις: καλεί semantic_check_expr
+ * - if/while: ελέγχει ότι η συνθήκη είναι int
+ * - for: ελέγχει init, cond, step, body
+ * - Σύνθετη εντολή: ελέγχει όλες τις εντολές της λίστας
+ * - cout/cin: ελέγχει όλες τις εκφράσεις/μεταβλητές
+ */
 void semantic_check_stmt(ASTNode *node, SymTable *st)
 {
     if (!node)
@@ -196,6 +261,7 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
 
     switch (node->kind)
     {
+    /* Εκφράσεις ως εντολές */
     case NODE_ASSIGN:
     case NODE_BINOP:
     case NODE_UNOP:
@@ -208,6 +274,7 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
         semantic_check_expr(node, st);
         break;
 
+    /* if-then-else: η συνθήκη πρέπει να είναι int */
     case NODE_IF:
     {
         SymType ct = semantic_check_expr(node->left, st);
@@ -219,6 +286,7 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
         break;
     }
 
+    /* while: η συνθήκη πρέπει να είναι int */
     case NODE_WHILE:
     {
         SymType ct = semantic_check_expr(node->left, st);
@@ -228,17 +296,20 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
         break;
     }
 
+    /* for: έλεγχος όλων των μερών */
     case NODE_FOR:
-        semantic_check_expr(node->left, st);
-        semantic_check_expr(node->right, st);
-        semantic_check_expr(node->extra, st);
-        semantic_check_stmt(node->next, st);
+        semantic_check_expr(node->left, st);  /* init */
+        semantic_check_expr(node->right, st); /* cond */
+        semantic_check_expr(node->extra, st); /* step */
+        semantic_check_stmt(node->next, st);  /* body */
         break;
 
+    /* return: έλεγχος τιμής επιστροφής */
     case NODE_RETURN:
         semantic_check_expr(node->left, st);
         break;
 
+    /* Σύνθετη εντολή: έλεγχος όλων των εντολών */
     case NODE_COMPOUND:
     {
         ASTNode *stmt = node->left;
@@ -250,6 +321,7 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
         break;
     }
 
+    /* cout: έλεγχος εκφράσεων εξόδου */
     case NODE_COUT:
     {
         ASTNode *item = node->left;
@@ -261,6 +333,7 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
         break;
     }
 
+    /* cin: έλεγχος μεταβλητών εισόδου */
     case NODE_CIN:
     {
         ASTNode *item = node->left;
@@ -277,6 +350,12 @@ void semantic_check_stmt(ASTNode *node, SymTable *st)
     }
 }
 
+/*
+ * semantic_check_program - Κύριος σημασιολογικός έλεγχος
+ *
+ * Καλείται μετά το parsing για έλεγχο ολόκληρου του προγράμματος.
+ * Εκτυπώνει σύνοψη αποτελεσμάτων.
+ */
 void semantic_check_program(ASTNode *root, SymTable *st)
 {
     if (!root)
