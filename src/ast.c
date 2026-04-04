@@ -1,8 +1,23 @@
+/*
+ * ast.c
+ * Υλοποίηση Αφηρημένου Συντακτικού Δέντρου (ΑΣΔ)
+ *
+ * Παρέχει συναρτήσεις κατασκευής κόμβων για κάθε τύπο
+ * κατασκευής της γλώσσας CPP.
+ *
+ * Όλες οι ast_make_* συναρτήσεις δεσμεύουν μνήμη με calloc
+ * (αρχικοποίηση σε 0) και ορίζουν τον τύπο του κόμβου.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "ast.h"
 
+/*
+ * ast_make_node - Βασική συνάρτηση κατασκευής κόμβου
+ * Δεσμεύει και αρχικοποιεί έναν νέο κόμβο ΑΣΔ
+ */
 static ASTNode *ast_make_node(NodeKind kind)
 {
     ASTNode *n = (ASTNode *)calloc(1, sizeof(ASTNode));
@@ -11,6 +26,9 @@ static ASTNode *ast_make_node(NodeKind kind)
     return n;
 }
 
+/* ==================== ΣΤΑΘΕΡΕΣ ==================== */
+
+/* Ακέραια σταθερά */
 ASTNode *ast_make_iconst(int val)
 {
     ASTNode *n = ast_make_node(NODE_ICONST);
@@ -19,6 +37,7 @@ ASTNode *ast_make_iconst(int val)
     return n;
 }
 
+/* Πραγματική σταθερά */
 ASTNode *ast_make_fconst(float val)
 {
     ASTNode *n = ast_make_node(NODE_FCONST);
@@ -27,6 +46,7 @@ ASTNode *ast_make_fconst(float val)
     return n;
 }
 
+/* Σταθερά χαρακτήρα */
 ASTNode *ast_make_cconst(char val)
 {
     ASTNode *n = ast_make_node(NODE_CCONST);
@@ -35,6 +55,7 @@ ASTNode *ast_make_cconst(char val)
     return n;
 }
 
+/* Σταθερά συμβολοσειράς */
 ASTNode *ast_make_sconst(char *val)
 {
     ASTNode *n = ast_make_node(NODE_SCONST);
@@ -43,6 +64,12 @@ ASTNode *ast_make_sconst(char *val)
     return n;
 }
 
+/* ==================== ΑΝΑΓΝΩΡΙΣΤΙΚΟ ==================== */
+
+/*
+ * Αναγνωριστικό: αποθηκεύει όνομα και τύπο από τον ΠΣ
+ * is_lvalue=1 γιατί τα αναγνωριστικά μπορούν να ανατεθούν
+ */
 ASTNode *ast_make_id(char *name, SymType type)
 {
     ASTNode *n = ast_make_node(NODE_ID);
@@ -52,6 +79,12 @@ ASTNode *ast_make_id(char *name, SymType type)
     return n;
 }
 
+/* ==================== ΤΕΛΕΣΤΕΣ ==================== */
+
+/*
+ * Δυαδικός τελεστής: αυτόματος υπολογισμός τύπου
+ * Αν ένα από τα δύο είναι float, το αποτέλεσμα είναι float
+ */
 ASTNode *ast_make_binop(char *op, ASTNode *left, ASTNode *right)
 {
     ASTNode *n = ast_make_node(NODE_BINOP);
@@ -68,6 +101,7 @@ ASTNode *ast_make_binop(char *op, ASTNode *left, ASTNode *right)
     return n;
 }
 
+/* Μοναδιαίος τελεστής: ο τύπος κληρονομείται από τον τελεστέο */
 ASTNode *ast_make_unop(char *op, ASTNode *operand)
 {
     ASTNode *n = ast_make_node(NODE_UNOP);
@@ -78,6 +112,7 @@ ASTNode *ast_make_unop(char *op, ASTNode *operand)
     return n;
 }
 
+/* Ανάθεση: ο τύπος είναι ο τύπος του αριστερού μέλους */
 ASTNode *ast_make_assign(ASTNode *left, ASTNode *right)
 {
     ASTNode *n = ast_make_node(NODE_ASSIGN);
@@ -88,6 +123,9 @@ ASTNode *ast_make_assign(ASTNode *left, ASTNode *right)
     return n;
 }
 
+/* ==================== ΚΛΗΣΗ ΣΥΝΑΡΤΗΣΗΣ ==================== */
+
+/* Κλήση συνάρτησης: name=όνομα, left=λίστα ορισμάτων */
 ASTNode *ast_make_call(char *name, ASTNode *args)
 {
     ASTNode *n = ast_make_node(NODE_CALL);
@@ -97,6 +135,14 @@ ASTNode *ast_make_call(char *name, ASTNode *args)
     return n;
 }
 
+/* ==================== ΔΟΜΕΣ ΕΛΕΓΧΟΥ ==================== */
+
+/*
+ * if-then-else:
+ * - left  = συνθήκη
+ * - right = then-branch
+ * - extra = else-branch (NULL αν δεν υπάρχει)
+ */
 ASTNode *ast_make_if(ASTNode *cond, ASTNode *then_br, ASTNode *else_br)
 {
     ASTNode *n = ast_make_node(NODE_IF);
@@ -106,6 +152,11 @@ ASTNode *ast_make_if(ASTNode *cond, ASTNode *then_br, ASTNode *else_br)
     return n;
 }
 
+/*
+ * while:
+ * - left  = συνθήκη
+ * - right = σώμα βρόχου
+ */
 ASTNode *ast_make_while(ASTNode *cond, ASTNode *body)
 {
     ASTNode *n = ast_make_node(NODE_WHILE);
@@ -114,7 +165,15 @@ ASTNode *ast_make_while(ASTNode *cond, ASTNode *body)
     return n;
 }
 
-ASTNode *ast_make_for(ASTNode *init, ASTNode *cond, ASTNode *step, ASTNode *body)
+/*
+ * for:
+ * - left  = αρχικοποίηση
+ * - right = συνθήκη
+ * - extra = βήμα
+ * - next  = σώμα βρόχου
+ */
+ASTNode *ast_make_for(ASTNode *init, ASTNode *cond,
+                      ASTNode *step, ASTNode *body)
 {
     ASTNode *n = ast_make_node(NODE_FOR);
     n->left = init;
@@ -124,6 +183,7 @@ ASTNode *ast_make_for(ASTNode *init, ASTNode *cond, ASTNode *step, ASTNode *body
     return n;
 }
 
+/* return: left=επιστρεφόμενη έκφραση (NULL αν void) */
 ASTNode *ast_make_return(ASTNode *expr)
 {
     ASTNode *n = ast_make_node(NODE_RETURN);
@@ -131,6 +191,7 @@ ASTNode *ast_make_return(ASTNode *expr)
     return n;
 }
 
+/* Σύνθετη εντολή: left=λίστα εντολών */
 ASTNode *ast_make_compound(ASTNode *stmts)
 {
     ASTNode *n = ast_make_node(NODE_COMPOUND);
@@ -139,6 +200,9 @@ ASTNode *ast_make_compound(ASTNode *stmts)
     return n;
 }
 
+/* ==================== ΔΗΛΩΣΕΙΣ ==================== */
+
+/* Δήλωση μεταβλητής */
 ASTNode *ast_make_var_decl(char *name, SymType type)
 {
     ASTNode *n = ast_make_node(NODE_VAR_DECL);
@@ -147,6 +211,9 @@ ASTNode *ast_make_var_decl(char *name, SymType type)
     return n;
 }
 
+/* ==================== ΕΙΣΟΔΟΣ/ΕΞΟΔΟΣ ==================== */
+
+/* cout <<: left=λίστα εκφράσεων προς εκτύπωση */
 ASTNode *ast_make_cout(ASTNode *exprs)
 {
     ASTNode *n = ast_make_node(NODE_COUT);
@@ -154,6 +221,7 @@ ASTNode *ast_make_cout(ASTNode *exprs)
     return n;
 }
 
+/* cin >>: left=λίστα μεταβλητών για ανάγνωση */
 ASTNode *ast_make_cin(ASTNode *vars)
 {
     ASTNode *n = ast_make_node(NODE_CIN);
@@ -161,11 +229,19 @@ ASTNode *ast_make_cin(ASTNode *vars)
     return n;
 }
 
+/* ==================== ΒΟΗΘΗΤΙΚΕΣ ==================== */
+
+/* Κατασκευή απλού κόμβου χωρίς παιδιά (για break/continue) */
 ASTNode *ast_make_node_simple(NodeKind kind)
 {
     return ast_make_node(kind);
 }
 
+/*
+ * Κόμβος μετατροπής τύπου (cast)
+ * - left = έκφραση προς μετατροπή
+ * - type = τύπος στόχος
+ */
 ASTNode *ast_make_cast(ASTNode *expr, SymType to_type)
 {
     ASTNode *n = ast_make_node(NODE_CAST);
@@ -174,6 +250,11 @@ ASTNode *ast_make_cast(ASTNode *expr, SymType to_type)
     return n;
 }
 
+/*
+ * ast_append - Προσθήκη κόμβου στο τέλος λίστας εντολών
+ * Χρησιμοποιεί το πεδίο next για σύνδεση εντολών
+ * Επιστρέφει την αρχή της λίστας
+ */
 ASTNode *ast_append(ASTNode *list, ASTNode *node)
 {
     if (!node)
@@ -181,6 +262,7 @@ ASTNode *ast_append(ASTNode *list, ASTNode *node)
     if (!list)
         return node;
 
+    /* Εύρεση τελευταίου κόμβου */
     ASTNode *last = list;
     int count = 0;
     while (last->next != NULL && count < 10000)
@@ -193,6 +275,9 @@ ASTNode *ast_append(ASTNode *list, ASTNode *node)
     return list;
 }
 
+/* ==================== ΕΚΤΥΠΩΣΗ ==================== */
+
+/* Μετατροπή NodeKind σε string για εκτύπωση */
 static const char *nodekind_str(NodeKind k)
 {
     switch (k)
@@ -250,18 +335,25 @@ static const char *nodekind_str(NodeKind k)
     }
 }
 
+/*
+ * ast_print_node - Εκτύπωση ενός κόμβου και των παιδιών του
+ * Χρησιμοποιεί εσοχή (indent) για οπτική αναπαράσταση δέντρου
+ */
 static void ast_print_node(ASTNode *node, int indent)
 {
     if (!node)
         return;
     if (indent > 30)
-        return;
+        return; /* Αποφυγή άπειρης αναδρομής */
 
+    /* Εσοχή */
     for (int i = 0; i < indent; i++)
         fprintf(stderr, "  ");
 
+    /* Τύπος κόμβου */
     fprintf(stderr, "[%s]", nodekind_str(node->kind));
 
+    /* Επιπλέον πληροφορία ανά τύπο κόμβου */
     switch (node->kind)
     {
     case NODE_ICONST:
@@ -295,13 +387,20 @@ static void ast_print_node(ASTNode *node, int indent)
     default:
         break;
     }
+
+    /* Τύπος δεδομένων */
     fprintf(stderr, " <%s>\n", symtype_to_str(node->type));
 
+    /* Αναδρομική εκτύπωση παιδιών */
     ast_print_node(node->left, indent + 1);
     ast_print_node(node->right, indent + 1);
     ast_print_node(node->extra, indent + 1);
 }
 
+/*
+ * ast_print - Εκτύπωση ΑΣΔ
+ * Ειδική διαχείριση για NODE_COMPOUND (εκτυπώνει τη λίστα εντολών)
+ */
 void ast_print(ASTNode *node, int indent)
 {
     if (!node)
@@ -312,6 +411,7 @@ void ast_print(ASTNode *node, int indent)
         for (int i = 0; i < indent; i++)
             fprintf(stderr, "  ");
         fprintf(stderr, "[COMPOUND] <unknown>\n");
+        /* Εκτύπωση όλων των εντολών της λίστας */
         ASTNode *stmt = node->left;
         while (stmt)
         {
@@ -325,6 +425,11 @@ void ast_print(ASTNode *node, int indent)
     }
 }
 
+/*
+ * ast_free - Απελευθέρωση μνήμης ΑΣΔ
+ * Αναδρομική απελευθέρωση όλων των κόμβων
+ * Προσοχή: ΔΕΝ απελευθερώνει το next (για να μην κάνει double free)
+ */
 void ast_free(ASTNode *node)
 {
     if (!node)
