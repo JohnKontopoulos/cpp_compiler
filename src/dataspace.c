@@ -1,8 +1,21 @@
+/*
+ * dataspace.c
+ * Υλοποίηση Χώρου Δεδομένων για τον μεταγλωττιστή CPP
+ *
+ * Υπολογίζει τα offsets των μεταβλητών για παραγωγή κώδικα MIPS.
+ * Τα offsets υπολογίζονται ξεχωριστά για καθολικές (global_offset)
+ * και τοπικές (local_offset) μεταβλητές.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "dataspace.h"
 
+/*
+ * dataspace_create - Δημιουργία νέου ΧΔ
+ * Αρχικοποιεί κενό ΧΔ με μηδενικά offsets
+ */
 DataSpace *dataspace_create()
 {
     DataSpace *ds = (DataSpace *)calloc(1, sizeof(DataSpace));
@@ -12,13 +25,25 @@ DataSpace *dataspace_create()
     return ds;
 }
 
+/*
+ * dataspace_destroy - Απελευθέρωση μνήμης ΧΔ
+ */
 void dataspace_destroy(DataSpace *ds)
 {
     if (ds)
         free(ds);
 }
 
-/* Μέγεθος τύπου σε bytes (για MIPS) */
+/*
+ * dataspace_type_size - Μέγεθος τύπου σε bytes για MIPS
+ *
+ * Μεγέθη:
+ * - int:    4 bytes (word)
+ * - float:  4 bytes (single precision)
+ * - char:   1 byte
+ * - string: 256 bytes (μέγιστο μέγεθος)
+ * - άλλοι:  4 bytes (default)
+ */
 int dataspace_type_size(SymType type)
 {
     switch (type)
@@ -30,12 +55,21 @@ int dataspace_type_size(SymType type)
     case TYPE_CHAR:
         return 1;
     case TYPE_STRING:
-        return 256; /* max string size */
+        return 256;
     default:
         return 4;
     }
 }
 
+/*
+ * dataspace_alloc - Δέσμευση χώρου για μεταβλητή
+ *
+ * Δημιουργεί νέα εγγραφή και υπολογίζει το offset:
+ * - GLOBAL: χρησιμοποιεί global_offset (αυξάνεται συνεχώς)
+ * - LOCAL/PARAM: χρησιμοποιεί local_offset (μηδενίζεται σε νέα συνάρτηση)
+ *
+ * Επιστρέφει: δείκτη στη νέα εγγραφή ή NULL αν ο ΧΔ είναι πλήρης
+ */
 DataEntry *dataspace_alloc(DataSpace *ds, const char *name,
                            SymType type, StorageClass storage, int depth)
 {
@@ -52,35 +86,48 @@ DataEntry *dataspace_alloc(DataSpace *ds, const char *name,
     e->depth = depth;
     e->size = dataspace_type_size(type);
 
-    /* Υπολογισμός offset */
+    /* Υπολογισμός offset βάσει κατηγορίας αποθήκευσης */
     if (storage == STORAGE_GLOBAL)
     {
         e->offset = ds->global_offset;
-        ds->global_offset += e->size;
+        ds->global_offset += e->size; /* Αύξηση καθολικού offset */
     }
     else
     {
         e->offset = ds->local_offset;
-        ds->local_offset += e->size;
+        ds->local_offset += e->size; /* Αύξηση τοπικού offset */
     }
 
     return e;
 }
 
+/*
+ * dataspace_enter_scope - Είσοδος σε νέα εμβέλεια
+ * Δεν μηδενίζει offset — συνεχίζουμε από εκεί που ήμασταν
+ * ώστε τα offsets να παραμένουν σωστά εντός της ίδιας συνάρτησης
+ */
 void dataspace_enter_scope(DataSpace *ds)
 {
-    /* ΔΕΝ μηδενίζουμε το offset — συνεχίζουμε από εκεί που ήμασταν */
+    /* Σκόπιμα κενό — το offset δεν μηδενίζεται */
 }
 
+/*
+ * dataspace_exit_scope - Έξοδος από εμβέλεια
+ *
+ * Εκτυπώνει τον ΧΔ της εμβέλειας και αφαιρεί τις τοπικές
+ * μεταβλητές της εμβέλειας (εκτός καθολικών).
+ * Μηδενίζει το local_offset για επαναχρησιμοποίηση.
+ */
 void dataspace_exit_scope(DataSpace *ds, int depth)
 {
-    /* Εκτύπωση ΧΔ για την εμβέλεια */
+    /* Εκτύπωση ΧΔ για αυτή την εμβέλεια */
     dataspace_print_scope(ds, depth);
 
-    /* Απελευθέρωση τοπικών μεταβλητών */
+    /* Αφαίρεση τοπικών μεταβλητών της εμβέλειας */
     int new_count = 0;
     for (int i = 0; i < ds->count; i++)
     {
+        /* Κρατάμε καθολικές και εγγραφές άλλων εμβελειών */
         if (ds->entries[i].depth != depth ||
             ds->entries[i].storage == STORAGE_GLOBAL)
         {
@@ -88,9 +135,13 @@ void dataspace_exit_scope(DataSpace *ds, int depth)
         }
     }
     ds->count = new_count;
-    ds->local_offset = 0;
+    ds->local_offset = 0; /* Επαναφορά τοπικού offset */
 }
 
+/*
+ * dataspace_print_scope - Εκτύπωση ΧΔ συγκεκριμένης εμβέλειας
+ * Εκτυπώνει όλες τις μεταβλητές της εμβέλειας depth στο stderr
+ */
 void dataspace_print_scope(DataSpace *ds, int depth)
 {
     fprintf(stderr, "\n[DataSpace] Scope depth %d:\n", depth);
@@ -98,6 +149,7 @@ void dataspace_print_scope(DataSpace *ds, int depth)
             "Name", "Type", "Storage", "Offset", "Size");
     fprintf(stderr, "%-20s %-10s %-10s %-8s %s\n",
             "----", "----", "-------", "------", "----");
+
     int found = 0;
     for (int i = 0; i < ds->count; i++)
     {
@@ -117,6 +169,10 @@ void dataspace_print_scope(DataSpace *ds, int depth)
         fprintf(stderr, "(empty)\n");
 }
 
+/*
+ * dataspace_print - Εκτύπωση ολόκληρου του ΧΔ
+ * Εκτυπώνει όλες τις εγγραφές ανεξαρτήτως εμβέλειας
+ */
 void dataspace_print(DataSpace *ds)
 {
     printf("\n[DataSpace] All entries:\n");
