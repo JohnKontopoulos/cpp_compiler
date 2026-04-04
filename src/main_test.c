@@ -4,6 +4,7 @@
 #include "semantic.h"
 #include "dataspace.h"
 #include "codegen.h"
+#include "optimizer.h"
 
 extern int yyparse();
 extern FILE *yyin;
@@ -12,7 +13,6 @@ extern DataSpace *dataspace;
 extern ASTNode *ast_root;
 extern int error_count;
 
-/* Global codegen για χρήση από τον parser */
 CodeGen *global_cg = NULL;
 
 static void print_ast(ASTNode *root)
@@ -107,6 +107,9 @@ int main(int argc, char *argv[])
             fclose(out);
         return 1;
     }
+
+    /* Βελτιστοποίηση */
+    ast_root = optimize(ast_root);
 
     /* Παραγωγή κώδικα */
     codegen_program(global_cg, ast_root);
