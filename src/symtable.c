@@ -1,9 +1,23 @@
+/*
+ * symtable.c
+ * Υλοποίηση Πίνακα Συμβόλων για τον μεταγλωττιστή CPP
+ *
+ * Χρησιμοποιεί hash table με chaining για αποδοτική
+ * εισαγωγή και αναζήτηση συμβόλων.
+ *
+ * Η αναζήτηση επιστρέφει το σύμβολο με το μεγαλύτερο
+ * βάθος εμβέλειας (πιο κοντινή δήλωση).
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "symtable.h"
 
-/* Απλή hash function */
+/*
+ * hash - Υπολογισμός hash value για όνομα συμβόλου
+ * Χρησιμοποιεί πολλαπλασιασμό με 31 (κλασική hash function)
+ */
 static unsigned int hash(const char *name)
 {
     unsigned int h = 0;
@@ -12,6 +26,10 @@ static unsigned int hash(const char *name)
     return h % MAX_SYMBOLS;
 }
 
+/*
+ * symtable_create - Δημιουργία νέου πίνακα συμβόλων
+ * Αρχικοποιεί κενό hash table σε βάθος εμβέλειας 0 (καθολική)
+ */
 SymTable *symtable_create()
 {
     SymTable *st = (SymTable *)malloc(sizeof(SymTable));
@@ -20,6 +38,10 @@ SymTable *symtable_create()
     return st;
 }
 
+/*
+ * symtable_destroy - Απελευθέρωση μνήμης πίνακα συμβόλων
+ * Απελευθερώνει όλες τις εγγραφές και τον ίδιο τον ΠΣ
+ */
 void symtable_destroy(SymTable *st)
 {
     for (int i = 0; i < MAX_SYMBOLS; i++)
@@ -35,14 +57,24 @@ void symtable_destroy(SymTable *st)
     free(st);
 }
 
+/*
+ * symtable_enter_scope - Είσοδος σε νέα εμβέλεια
+ * Αυξάνει το βάθος εμβέλειας κατά 1
+ */
 void symtable_enter_scope(SymTable *st)
 {
     st->current_depth++;
     fprintf(stderr, "[Scope] Entering depth %d\n", st->current_depth);
 }
 
+/*
+ * symtable_exit_scope - Έξοδος από τρέχουσα εμβέλεια
+ * Εκτυπώνει τα σύμβολα της εμβέλειας και μειώνει το βάθος
+ * Σημείωση: ΔΕΝ διαγράφει τα σύμβολα (χρειάζονται για σημασιολογικό έλεγχο)
+ */
 void symtable_exit_scope(SymTable *st)
 {
+    /* Εκτύπωση συμβόλων τρέχουσας εμβέλειας */
     fprintf(stderr, "\n[Scope] Exiting depth %d - Symbols:\n", st->current_depth);
     fprintf(stderr, "%-20s %-12s %-12s %s\n", "Name", "Kind", "Type", "Depth");
     fprintf(stderr, "%-20s %-12s %-12s %s\n", "----", "----", "----", "-----");
@@ -67,20 +99,32 @@ void symtable_exit_scope(SymTable *st)
     fprintf(stderr, "[Scope] Back to depth %d\n\n", st->current_depth);
 }
 
-Symbol *symtable_insert(SymTable *st, const char *name, SymKind kind, SymType type)
+/*
+ * symtable_insert - Εισαγωγή νέου συμβόλου στον ΠΣ
+ *
+ * Ελέγχει αν υπάρχει ήδη σύμβολο με το ίδιο όνομα στην
+ * τρέχουσα εμβέλεια. Αν ναι, επιστρέφει NULL με μήνυμα σφάλματος.
+ * Αν όχι, δημιουργεί νέα εγγραφή και την εισάγει στο hash table.
+ *
+ * Επιστρέφει: δείκτη στο νέο σύμβολο ή NULL αν υπάρχει conflict
+ */
+Symbol *symtable_insert(SymTable *st, const char *name,
+                        SymKind kind, SymType type)
 {
     if (!name || strlen(name) == 0)
         return NULL;
 
-    /* Έλεγχος αν υπάρχει ήδη στην ίδια εμβέλεια */
+    /* Έλεγχος για διπλή δήλωση στην ίδια εμβέλεια */
     Symbol *existing = symtable_lookup_current(st, name);
     if (existing)
     {
-        fprintf(stderr, "Semantic error: '%s' already declared in this scope (depth %d)\n",
+        fprintf(stderr,
+                "Semantic error: '%s' already declared in this scope (depth %d)\n",
                 name, st->current_depth);
         return NULL;
     }
 
+    /* Δημιουργία νέας εγγραφής */
     unsigned int h = hash(name);
     Symbol *s = (Symbol *)malloc(sizeof(Symbol));
     memset(s, 0, sizeof(Symbol));
@@ -90,19 +134,29 @@ Symbol *symtable_insert(SymTable *st, const char *name, SymKind kind, SymType ty
     s->type = type;
     s->depth = st->current_depth;
     s->is_static = 0;
+
+    /* Εισαγωγή στην αρχή της λίστας (chaining) */
     s->next = st->table[h];
     st->table[h] = s;
 
     return s;
 }
 
+/*
+ * symtable_lookup - Αναζήτηση συμβόλου στον ΠΣ
+ *
+ * Ψάχνει σε όλες τις εμβέλειες και επιστρέφει το σύμβολο
+ * με το μεγαλύτερο βάθος (πιο κοντινή δήλωση = shadowing).
+ *
+ * Επιστρέφει: δείκτη στο σύμβολο ή NULL αν δεν βρεθεί
+ */
 Symbol *symtable_lookup(SymTable *st, const char *name)
 {
     unsigned int h = hash(name);
     Symbol *s = st->table[h];
     Symbol *best = NULL;
 
-    /* Βρίσκουμε το σύμβολο με το μεγαλύτερο depth (πιο κοντινή εμβέλεια) */
+    /* Εύρεση συμβόλου με μεγαλύτερο depth (πιο κοντινή εμβέλεια) */
     while (s)
     {
         if (strcmp(s->name, name) == 0)
@@ -115,6 +169,12 @@ Symbol *symtable_lookup(SymTable *st, const char *name)
     return best;
 }
 
+/*
+ * symtable_lookup_current - Αναζήτηση μόνο στην τρέχουσα εμβέλεια
+ * Χρησιμοποιείται για έλεγχο διπλής δήλωσης
+ *
+ * Επιστρέφει: δείκτη στο σύμβολο ή NULL αν δεν βρεθεί
+ */
 Symbol *symtable_lookup_current(SymTable *st, const char *name)
 {
     unsigned int h = hash(name);
@@ -128,6 +188,10 @@ Symbol *symtable_lookup_current(SymTable *st, const char *name)
     return NULL;
 }
 
+/*
+ * symtable_print_current_scope - Εκτύπωση τρέχουσας εμβέλειας
+ * Εκτυπώνει όλα τα σύμβολα της τρέχουσας εμβέλειας
+ */
 void symtable_print_current_scope(SymTable *st)
 {
     printf("\n[SymTable] Current scope (depth %d):\n", st->current_depth);
@@ -151,6 +215,9 @@ void symtable_print_current_scope(SymTable *st)
     }
 }
 
+/*
+ * symkind_to_str - Μετατροπή SymKind σε string
+ */
 const char *symkind_to_str(SymKind kind)
 {
     switch (kind)
@@ -176,6 +243,9 @@ const char *symkind_to_str(SymKind kind)
     }
 }
 
+/*
+ * symtype_to_str - Μετατροπή SymType σε string
+ */
 const char *symtype_to_str(SymType type)
 {
     switch (type)
