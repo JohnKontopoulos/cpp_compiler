@@ -12,4 +12,6 @@ ASTNode *constant_folding(ASTNode *node);
 /* #3 Απαλοιφή άχρηστου κώδικα */
 ASTNode *dead_code_elimination(ASTNode *node);
 
+ASTNode *copy_propagation(ASTNode *node);
+
 #endif
