@@ -780,7 +780,29 @@ Program parsed successfully!
     [ICONST] 0 <int>
 
 ========== Semantic Analysis ==========
-Semantic error: function 'add' expects 2 params but got 1
 [Semantic] cast int→float added
-1 semantic error(s) found.
-Aborting: 1 semantic error(s) found.
+No semantic errors found!
+
+========== Optimization ==========
+[Optimizer] Copy propagation: sum = 1
+[Optimizer] Copy propagation: sum = 2
+[Optimizer] Copy propagation: sum = 3
+[Optimizer] Copy propagation: sum = 4
+[Optimizer] Copy propagation: sum = 5
+[Optimizer] Copy propagation: sum = 6
+[Optimizer] Copy propagation: sum = 7
+[Optimizer] Copy propagation: sum = 8
+[Optimizer] Copy propagation: sum = 9
+[Optimizer] Copy propagation: i = 0
+[Optimizer] Copy propagation: sum = 0
+[Optimizer] Copy propagation: replace i with 0
+[Optimizer] Copy propagation: i = 0
+[Optimizer] Copy propagation: sum = 100
+[Optimizer] Copy propagation: replace sum with 100
+[Optimizer] Copy propagation: a = 42
+[Optimizer] Copy propagation: replace a with 42
+[Optimizer] Copy propagation: b = 42
+[Optimizer] Copy propagation: replace b with 42
+[Optimizer] Copy propagation: sum = 999
+[Optimizer] Copy propagation: sum = 999
+Optimization complete.
