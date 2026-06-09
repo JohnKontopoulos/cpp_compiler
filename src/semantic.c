@@ -68,6 +68,46 @@ SymType result_type(SymType t1, SymType t2)
 }
 
 /*
+ * count_args - Μέτρημα ορισμάτων κλήσης συνάρτησης
+ *
+ * Τα ορίσματα μπορεί να είναι:
+ * - Συνδεδεμένα με BINOP "," (π.χ. add(a,b) → BINOP, → a,b)
+ * - Συνδεδεμένα με next links (απλή έκφραση)
+ * Επιστρέφει: αριθμός ορισμάτων
+ */
+static int count_args(ASTNode *arg, SymTable *st)
+{
+    if (!arg)
+        return 0;
+
+    /* Αν είναι BINOP "," μετράμε αναδρομικά */
+    if (arg->kind == NODE_BINOP && arg->name && strcmp(arg->name, ",") == 0)
+    {
+        int count = 0;
+        ASTNode *tmp = arg;
+        /* Διαπέραση αριστερά για όλα τα κόμματα */
+        while (tmp && tmp->kind == NODE_BINOP &&
+               tmp->name && strcmp(tmp->name, ",") == 0)
+        {
+            semantic_check_expr(tmp->right, st);
+            count++;
+            tmp = tmp->left;
+        }
+        /* Το τελευταίο αριστερό παιδί */
+        if (tmp)
+        {
+            semantic_check_expr(tmp, st);
+            count++;
+        }
+        return count;
+    }
+
+    /* Απλή περίπτωση: ένα μόνο όρισμα */
+    semantic_check_expr(arg, st);
+    return 1;
+}
+
+/*
  * semantic_check_expr - Σημασιολογικός έλεγχος έκφρασης
  *
  * Διαπερνά αναδρομικά το ΑΣΔ και:
@@ -217,15 +257,12 @@ SymType semantic_check_expr(ASTNode *node, SymTable *st)
             return TYPE_UNKNOWN;
         }
 
-        /* Έλεγχος αριθμού παραμέτρων */
-        int actual_count = 0;
-        ASTNode *arg = node->left;
-        while (arg)
-        {
-            semantic_check_expr(arg, st);
-            actual_count++;
-            arg = arg->next;
-        }
+        /*
+         * Έλεγχος αριθμού παραμέτρων
+         * Τα ορίσματα μπορεί να είναι συνδεδεμένα με BINOP ","
+         * ή με next links — χρησιμοποιούμε count_args()
+         */
+        int actual_count = count_args(node->left, st);
 
         if (s->param_count > 0 && actual_count != s->param_count)
         {

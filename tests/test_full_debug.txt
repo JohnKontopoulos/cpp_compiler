@@ -1,0 +1,786 @@
+TYPEDEF
+CHAR
+ID(mystring)
+LBRACK
+ICONST(256)
+RBRACK
+SEMI
+[SymTable] typedef 'mystring' = type char
+CONST
+INT
+ID(MAX)
+ASSIGN
+ICONST(100)
+SEMI
+[SymTable] const 'MAX' type=int
+CONST
+FLOAT
+ID(PI)
+ASSIGN
+FCONST(3.14159)
+SEMI
+[SymTable] const 'PI' type=float
+CONST
+CHAR
+ID(NL)
+ASSIGN
+CCONST('\n')
+SEMI
+[SymTable] const 'NL' type=char
+CONST
+STRING
+ID(MSG)
+ASSIGN
+SCONST("hello world")
+SEMI
+[SymTable] const 'MSG' type=string
+ENUM
+ID(color)
+LBRACE
+ID(red)
+ASSIGN
+ICONST(1)
+COMMA
+ID(green)
+COMMA
+ID(blue)
+RBRACE
+SEMI
+INT
+ID(hex_val)
+[SymTable] function 'hex_val' return_type=int
+ASSIGN
+ICONST(0XFF)
+SEMI
+INT
+ID(oct_val)
+[SymTable] function 'oct_val' return_type=int
+ASSIGN
+ICONST(0O77)
+SEMI
+INT
+ID(bin_val)
+[SymTable] function 'bin_val' return_type=int
+ASSIGN
+ICONST(0B1010)
+SEMI
+INT
+ID(dec_val)
+[SymTable] function 'dec_val' return_type=int
+ASSIGN
+ICONST(255)
+SEMI
+FLOAT
+ID(f1)
+[SymTable] function 'f1' return_type=float
+ASSIGN
+FCONST(3.14)
+SEMI
+FLOAT
+ID(f2)
+[SymTable] function 'f2' return_type=float
+ASSIGN
+FCONST(1.5E2)
+SEMI
+FLOAT
+ID(f3)
+[SymTable] function 'f3' return_type=float
+ASSIGN
+FCONST(.5e-3)
+SEMI
+INT
+ID(g_count)
+[SymTable] function 'g_count' return_type=int
+ASSIGN
+ICONST(0)
+SEMI
+FLOAT
+ID(g_ratio)
+[SymTable] function 'g_ratio' return_type=float
+ASSIGN
+FCONST(1.0)
+SEMI
+INT
+ID(add)
+[SymTable] function 'add' return_type=int
+LPAREN
+INT
+ID(a)
+COMMA
+[SymTable] param 0: type=int by_value
+INT
+ID(b)
+RPAREN
+[SymTable] param 1: type=int by_value
+LBRACE
+[Scope] Entering depth 1
+INT
+ID(r)
+SEMI
+ID(r)
+ASSIGN
+ID(a)
+ADDOP
+ID(b)
+SEMI
+RETURN
+ID(r)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 1 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+r                    PARAMETER    int          1
+[Scope] Back to depth 0
+
+
+[DataSpace] Scope depth 1:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+r                    int        param      8        4
+
+=== AST for function 'add' ===
+  [ASSIGN] <int>
+    [ID] r <int>
+    [BINOP] + <int>
+      [ID] a <int>
+      [ID] b <int>
+  [RETURN] <unknown>
+    [ID] r <int>
+INT
+MAIN
+LPAREN
+RPAREN
+LBRACE
+[Scope] Entering depth 1
+INT
+ID(a)
+SEMI
+INT
+ID(b)
+SEMI
+INT
+ID(sum)
+SEMI
+INT
+ID(i)
+SEMI
+FLOAT
+ID(f)
+SEMI
+CHAR
+ID(c)
+SEMI
+INT
+ID(arr)
+LBRACK
+ICONST(10)
+RBRACK
+SEMI
+CIN
+INP
+ID(a)
+INP
+ID(b)
+SEMI
+COUT
+OUT
+ID(MSG)
+SEMI
+ID(sum)
+ASSIGN
+ID(add)
+LPAREN
+ID(a)
+COMMA
+ID(b)
+RPAREN
+SEMI
+COUT
+OUT
+ID(sum)
+SEMI
+ID(f)
+ASSIGN
+ID(a)
+SEMI
+ID(sum)
+ASSIGN
+ID(a)
+ADDOP
+ID(b)
+SEMI
+ID(sum)
+ASSIGN
+ID(a)
+ADDOP
+ID(b)
+SEMI
+ID(sum)
+ASSIGN
+ID(a)
+MULOP
+ID(b)
+SEMI
+ID(sum)
+ASSIGN
+ID(a)
+MULOP
+ID(b)
+SEMI
+ID(sum)
+ASSIGN
+ID(a)
+MULOP
+ID(b)
+SEMI
+IF
+LPAREN
+ID(a)
+EQUOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(1)
+SEMI
+IF
+LPAREN
+ID(a)
+EQUOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(2)
+SEMI
+IF
+LPAREN
+ID(a)
+RELOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(3)
+SEMI
+IF
+LPAREN
+ID(a)
+RELOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(4)
+SEMI
+IF
+LPAREN
+ID(a)
+RELOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(5)
+SEMI
+IF
+LPAREN
+ID(a)
+RELOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(6)
+SEMI
+IF
+LPAREN
+ID(a)
+ANDOP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(7)
+SEMI
+IF
+LPAREN
+ID(a)
+OROP
+ID(b)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(8)
+SEMI
+IF
+LPAREN
+NOTOP
+ID(a)
+RPAREN
+ID(sum)
+ASSIGN
+ICONST(9)
+SEMI
+ID(a)
+INCDEC
+SEMI
+ID(a)
+INCDEC
+SEMI
+INCDEC
+ID(b)
+SEMI
+INCDEC
+ID(b)
+SEMI
+ID(i)
+ASSIGN
+ICONST(0)
+SEMI
+ID(sum)
+ASSIGN
+ICONST(0)
+SEMI
+WHILE
+LPAREN
+ID(i)
+RELOP
+ICONST(10)
+RPAREN
+LBRACE
+[Scope] Entering depth 2
+ID(sum)
+ASSIGN
+ID(sum)
+ADDOP
+ID(i)
+SEMI
+ID(i)
+INCDEC
+SEMI
+RBRACE
+
+[Scope] Exiting depth 2 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+[Scope] Back to depth 1
+
+
+[DataSpace] Scope depth 2:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+(empty)
+FOR
+LPAREN
+ID(i)
+ASSIGN
+ICONST(0)
+SEMI
+ID(i)
+RELOP
+ICONST(5)
+SEMI
+ID(i)
+INCDEC
+RPAREN
+LBRACE
+[Scope] Entering depth 2
+ID(sum)
+ASSIGN
+ID(sum)
+ADDOP
+ID(i)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 2 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+[Scope] Back to depth 1
+
+
+[DataSpace] Scope depth 2:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+(empty)
+IF
+LPAREN
+ID(sum)
+RELOP
+ICONST(100)
+RPAREN
+LBRACE
+[Scope] Entering depth 2
+ID(sum)
+ASSIGN
+ICONST(100)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 2 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+[Scope] Back to depth 1
+
+
+[DataSpace] Scope depth 2:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+(empty)
+ELSE
+LBRACE
+[Scope] Entering depth 2
+ID(sum)
+ASSIGN
+ID(sum)
+ADDOP
+ICONST(1)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 2 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+[Scope] Back to depth 1
+
+
+[DataSpace] Scope depth 2:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+(empty)
+ID(arr)
+LBRACK
+ICONST(0)
+RBRACK
+ASSIGN
+ICONST(42)
+SEMI
+COUT
+OUT
+ID(arr)
+LBRACK
+ICONST(0)
+RBRACK
+SEMI
+ID(sum)
+ASSIGN
+ICONST(2)
+ADDOP
+ICONST(3)
+SEMI
+ID(sum)
+ASSIGN
+ID(sum)
+MULOP
+ICONST(0)
+SEMI
+ID(sum)
+ASSIGN
+ID(sum)
+ADDOP
+ICONST(0)
+SEMI
+ID(sum)
+ASSIGN
+ID(sum)
+MULOP
+ICONST(1)
+SEMI
+ID(a)
+ASSIGN
+ICONST(42)
+SEMI
+ID(b)
+ASSIGN
+ID(a)
+SEMI
+COUT
+OUT
+ID(b)
+SEMI
+IF
+LPAREN
+ICONST(0)
+RPAREN
+LBRACE
+[Scope] Entering depth 2
+ID(sum)
+ASSIGN
+ICONST(999)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 2 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+[Scope] Back to depth 1
+
+
+[DataSpace] Scope depth 2:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+(empty)
+WHILE
+LPAREN
+ICONST(0)
+RPAREN
+LBRACE
+[Scope] Entering depth 2
+ID(sum)
+ASSIGN
+ICONST(999)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 2 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+[Scope] Back to depth 1
+
+
+[DataSpace] Scope depth 2:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+(empty)
+RETURN
+ICONST(0)
+SEMI
+RBRACE
+
+[Scope] Exiting depth 1 - Symbols:
+Name                 Kind         Type         Depth
+----                 ----         ----         -----
+a                    VARIABLE     int          1
+b                    VARIABLE     int          1
+c                    VARIABLE     char         1
+f                    VARIABLE     float        1
+i                    VARIABLE     int          1
+r                    PARAMETER    int          1
+sum                  VARIABLE     int          1
+arr                  VARIABLE     int          1
+[Scope] Back to depth 0
+
+
+[DataSpace] Scope depth 1:
+Name                 Type       Storage    Offset   Size
+----                 ----       -------    ------   ----
+a                    int        local      0        4
+b                    int        local      4        4
+sum                  int        local      8        4
+i                    int        local      12       4
+f                    float      local      16       4
+c                    char       local      20       1
+arr                  int        local      21       4
+Program parsed successfully!
+
+==================== AST ====================
+[COMPOUND] <unknown>
+  [CIN] <unknown>
+    [ID] a <int>
+  [COUT] <unknown>
+    [ID] MSG <string>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [CALL] add() <unknown>
+      [BINOP] , <int>
+        [ID] a <int>
+        [ID] b <int>
+  [COUT] <unknown>
+    [ID] sum <int>
+  [ASSIGN] <float>
+    [ID] f <float>
+    [ID] a <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] + <int>
+      [ID] a <int>
+      [ID] b <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] + <int>
+      [ID] a <int>
+      [ID] b <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] * <int>
+      [ID] a <int>
+      [ID] b <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] * <int>
+      [ID] a <int>
+      [ID] b <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] * <int>
+      [ID] a <int>
+      [ID] b <int>
+  [IF] <unknown>
+    [BINOP] == <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 1 <int>
+  [IF] <unknown>
+    [BINOP] == <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 2 <int>
+  [IF] <unknown>
+    [BINOP] <> <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 3 <int>
+  [IF] <unknown>
+    [BINOP] <> <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 4 <int>
+  [IF] <unknown>
+    [BINOP] <> <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 5 <int>
+  [IF] <unknown>
+    [BINOP] <> <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 6 <int>
+  [IF] <unknown>
+    [BINOP] && <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 7 <int>
+  [IF] <unknown>
+    [BINOP] || <int>
+      [ID] a <int>
+      [ID] b <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 8 <int>
+  [IF] <unknown>
+    [UNOP] ! <int>
+      [ID] a <int>
+    [ASSIGN] <int>
+      [ID] sum <int>
+      [ICONST] 9 <int>
+  [UNOP] post++ <int>
+    [ID] a <int>
+  [UNOP] post++ <int>
+    [ID] a <int>
+  [UNOP] pre++ <int>
+    [ID] b <int>
+  [UNOP] pre++ <int>
+    [ID] b <int>
+  [ASSIGN] <int>
+    [ID] i <int>
+    [ICONST] 0 <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [ICONST] 0 <int>
+  [WHILE] <unknown>
+    [BINOP] <> <int>
+      [ID] i <int>
+      [ICONST] 10 <int>
+    [COMPOUND] <unknown>
+      [ASSIGN] <int>
+        [ID] sum <int>
+        [BINOP] + <int>
+          [ID] sum <int>
+          [ID] i <int>
+  [FOR] <unknown>
+    [ASSIGN] <int>
+      [ID] i <int>
+      [ICONST] 0 <int>
+    [BINOP] <> <int>
+      [ID] i <int>
+      [ICONST] 5 <int>
+    [UNOP] post++ <int>
+      [ID] i <int>
+  [IF] <unknown>
+    [BINOP] <> <int>
+      [ID] sum <int>
+      [ICONST] 100 <int>
+    [COMPOUND] <unknown>
+      [ASSIGN] <int>
+        [ID] sum <int>
+        [ICONST] 100 <int>
+    [COMPOUND] <unknown>
+      [ASSIGN] <int>
+        [ID] sum <int>
+        [BINOP] + <int>
+          [ID] sum <int>
+          [ICONST] 1 <int>
+  [ASSIGN] <int>
+    [BINOP] [] <int>
+      [ID] arr <int>
+      [ICONST] 0 <int>
+    [ICONST] 42 <int>
+  [COUT] <unknown>
+    [BINOP] [] <int>
+      [ID] arr <int>
+      [ICONST] 0 <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] + <int>
+      [ICONST] 2 <int>
+      [ICONST] 3 <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] * <int>
+      [ID] sum <int>
+      [ICONST] 0 <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] + <int>
+      [ID] sum <int>
+      [ICONST] 0 <int>
+  [ASSIGN] <int>
+    [ID] sum <int>
+    [BINOP] * <int>
+      [ID] sum <int>
+      [ICONST] 1 <int>
+  [ASSIGN] <int>
+    [ID] a <int>
+    [ICONST] 42 <int>
+  [ASSIGN] <int>
+    [ID] b <int>
+    [ID] a <int>
+  [COUT] <unknown>
+    [ID] b <int>
+  [IF] <unknown>
+    [ICONST] 0 <int>
+    [COMPOUND] <unknown>
+      [ASSIGN] <int>
+        [ID] sum <int>
+        [ICONST] 999 <int>
+  [WHILE] <unknown>
+    [ICONST] 0 <int>
+    [COMPOUND] <unknown>
+      [ASSIGN] <int>
+        [ID] sum <int>
+        [ICONST] 999 <int>
+  [RETURN] <unknown>
+    [ICONST] 0 <int>
+
+========== Semantic Analysis ==========
+Semantic error: function 'add' expects 2 params but got 1
+[Semantic] cast int→float added
+1 semantic error(s) found.
+Aborting: 1 semantic error(s) found.

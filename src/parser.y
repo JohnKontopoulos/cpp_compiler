@@ -454,10 +454,12 @@ pass_list_dims
 
 /* Λίστα παραμέτρων με ονόματα (για ορισμούς συναρτήσεων) */
 parameter_list
-    : parameter_list COMMA typename pass_variabledef
+    : parameter_list COMMA typename
         { current_type = $3; }
-    | typename pass_variabledef
+      pass_variabledef
+    | typename
         { current_type = $1; }
+      pass_variabledef
     ;
 
 /* Ορισμός παραμέτρου: by value ή by reference */
